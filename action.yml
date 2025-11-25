@@ -1,6 +1,6 @@
 name: 'Changed Areas'
 description: 'Detect changed files and classify them into areas for monorepo CI/CD'
-author: 'Your Name'
+author: 'Harsh Khati'
 branding:
   icon: 'git-branch'
   color: 'blue'
