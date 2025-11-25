@@ -1,10 +1,9 @@
-
 name: CI with Changed Areas
 
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, develop]
 
 jobs:
   detect-changes:
@@ -14,10 +13,12 @@ jobs:
       frontend_changed: ${{ steps.changes.outputs.frontend_changed }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       
       - name: Detect changed areas
         id: changes
-        uses: f1rmtea/changed-files@v1
+        uses: f1rmtea/changed-files@main
         with:
           config: .github/changed-areas.yml
 

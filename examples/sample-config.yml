@@ -3,22 +3,25 @@ areas:
     include:
       - "src/backend/**"
       - "src/api/**"
+      - "src/shared/**"
     exclude:
       - "**/*.test.ts"
       - "**/*.spec.ts"
+      - "**/fixtures/**"
     required_extensions: [".ts", ".tsx"]
     exclude_binary_files: true
     min_changed_files: 1
 
   frontend:
     include:
+      - "src/frontend/**"
       - "src/components/**"
-      - "src/pages/**"
       - "public/**"
     exclude:
       - "**/*.test.tsx"
       - "**/*.stories.tsx"
     required_extensions: [".tsx", ".ts", ".css", ".scss"]
+    ignore_deleted_files: false
 
   infrastructure:
     include:
@@ -31,7 +34,7 @@ areas:
   documentation:
     include:
       - "docs/**"
-      - "*.md"
       - "README.md"
+      - "*.md"
     required_extensions: [".md", ".mdx"]
     ignore_deleted_files: false
