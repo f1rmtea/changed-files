@@ -1,6 +1,11 @@
 import { GitHubContext, EdgeCaseConfig, ChangedFile } from '../types';
-export declare function isFirstCommit(event: any): boolean;
-export declare function isForcePush(event: any): boolean;
+interface PushEvent {
+    before: string;
+    after: string;
+    forced?: boolean;
+}
+export declare function isFirstCommit(event: PushEvent): boolean;
+export declare function isForcePush(event: PushEvent): boolean;
 export declare function isEmptyCommit(files: ChangedFile[]): boolean;
 export declare function handleFirstCommit(sha: string): {
     strategy: string;
@@ -14,4 +19,5 @@ export declare function handleEmptyCommit(config: EdgeCaseConfig): {
     strategy: string;
     triggerAll: boolean;
 };
+export {};
 //# sourceMappingURL=edge-cases.d.ts.map

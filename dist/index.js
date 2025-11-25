@@ -34561,9 +34561,20 @@ class ConfigValidator {
         this.config = config;
     }
     validate() {
+        this.errors = [];
+        this.warnings = [];
+        // First check if config has areas field
+        if (!this.config.areas) {
+            this.addError(null, null, 'Missing required "areas" field');
+            return {
+                valid: false,
+                errors: this.errors,
+                warnings: this.warnings
+            };
+        }
         this.validateSchema();
-        this.validateLogic();
         this.validatePatterns();
+        this.validateLogic();
         return {
             valid: this.errors.length === 0,
             errors: this.errors,
@@ -34639,15 +34650,17 @@ class ConfigValidator {
             'ignore_renamed_files'
         ];
         for (const flag of booleanFlags) {
-            if (config[flag] !== undefined && typeof config[flag] !== 'boolean') {
+            const value = config[flag];
+            if (value !== undefined && typeof value !== 'boolean') {
                 this.addError(name, flag, `"${flag}" must be true or false`);
             }
         }
     }
+    // ... rest of the file remains the same
     validateLogic() {
         for (const [name, config] of Object.entries(this.config.areas)) {
             // Check: only excludes without includes
-            if ((config.exclude && config.exclude.length > 0) && (config.include && config.include.length === 0)) {
+            if ((config.exclude?.length ?? 0) > 0 && (config.include?.length ?? 0) === 0) {
                 this.addError(name, null, 'Area has exclude patterns but no include patterns', 'Add at least one include pattern to define what this area matches');
             }
             // Check: include and exclude contain same pattern
@@ -34689,8 +34702,8 @@ class ConfigValidator {
             new minimatch_1.Minimatch(pattern);
         }
         catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            this.addError(area, field, `Invalid glob pattern "${pattern}": ${errorMessage}`);
+            const err = error;
+            this.addError(area, field, `Invalid glob pattern "${pattern}": ${err.message}`);
         }
         // Check for multiple consecutive slashes
         if (pattern.includes('//')) {
@@ -34851,7 +34864,9 @@ async function getChangedFilesFromPR(context, token) {
     const perPage = 100;
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
         try {
-            while (true) {
+            let hasMorePages = true;
+            // Replace while(true) with while(hasMorePages)
+            while (hasMorePages) {
                 const response = await octokit.rest.pulls.listFiles({
                     owner,
                     repo,
@@ -34866,21 +34881,25 @@ async function getChangedFilesFromPR(context, token) {
                     binary: (0, binary_files_1.isBinaryFile)(file.filename)
                 }));
                 allFiles.push(...files);
+                // Check if there are more pages
                 if (response.data.length < perPage) {
-                    break;
+                    hasMorePages = false;
                 }
-                page++;
+                else {
+                    page++;
+                }
             }
             logger_1.Logger.info(`Found ${allFiles.length} changed file(s) in PR #${pullNumber}`);
             return allFiles;
         }
-        catch (error) {
+        catch (error) { // Change any to unknown
             if (attempt < MAX_RETRIES - 1) {
                 logger_1.Logger.warn(`API request failed (attempt ${attempt + 1}/${MAX_RETRIES}), retrying...`);
                 await sleep(RETRY_DELAY * (attempt + 1));
             }
             else {
-                throw new errors_1.GitHubAPIError(`Failed to fetch PR files after ${MAX_RETRIES} attempts: ${error.message}`, error.status);
+                const err = error;
+                throw new errors_1.GitHubAPIError(`Failed to fetch PR files after ${MAX_RETRIES} attempts: ${err.message}`, err.status);
             }
         }
     }
@@ -34948,7 +34967,8 @@ async function getChangedFilesFromPush(context, token, baseRef, headRef) {
                 await sleep(RETRY_DELAY * (attempt + 1));
             }
             else {
-                throw new errors_1.GitHubAPIError(`Failed to compare commits after ${MAX_RETRIES} attempts: ${error.message}`, error.status);
+                const err = error;
+                throw new errors_1.GitHubAPIError(`Failed to compare commits after ${MAX_RETRIES} attempts: ${err.message}`, err.status);
             }
         }
     }
@@ -35152,22 +35172,25 @@ async function run() {
         logger_1.Logger.info(`✅ Successfully analyzed ${changedFiles.length} changed file(s)`);
     }
     catch (error) {
+        const err = error;
         if (error instanceof errors_1.ConfigError) {
-            logger_1.Logger.error(`Configuration error: ${error.message}`);
+            logger_1.Logger.error(`Configuration error: ${err.message}`);
             core.setFailed('Invalid configuration');
         }
         else if (error instanceof errors_1.GitHubAPIError) {
-            logger_1.Logger.error(`GitHub API error: ${error.message}`);
+            logger_1.Logger.error(`GitHub API error: ${err.message}`);
             core.setFailed('Failed to fetch changed files from GitHub');
         }
         else if (error instanceof errors_1.ValidationError) {
-            logger_1.Logger.error(`Validation error: ${error.message}`);
+            logger_1.Logger.error(`Validation error: ${err.message}`);
             core.setFailed('Configuration validation failed');
         }
         else {
-            logger_1.Logger.error(`Unexpected error: ${error.message}`);
-            logger_1.Logger.error(error.stack);
-            core.setFailed(error.message);
+            logger_1.Logger.error(`Unexpected error: ${err.message}`);
+            if (err.stack) {
+                logger_1.Logger.error(err.stack);
+            }
+            core.setFailed(err.message);
         }
     }
 }

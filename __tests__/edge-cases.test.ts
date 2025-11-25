@@ -5,15 +5,19 @@ describe('Edge Case Detection', () => {
   describe('First Commit', () => {
     it('should detect zero SHA', () => {
       const event = {
-        before: '0000000000000000000000000000000000000000'
+        before: '0000000000000000000000000000000000000000',
+        after: 'some-commit-hash',
+        forced: false
       };
 
       expect(isFirstCommit(event)).toBe(true);
     });
 
-    it('should detect normal commit', () => {
+    it('should detect non-zero SHA', () => {
       const event = {
-        before: 'abc123def456'
+        before: 'a1b2c3d4e5f6g7h8i9j0',
+        after: 'some-commit-hash',
+        forced: false
       };
 
       expect(isFirstCommit(event)).toBe(false);
@@ -21,8 +25,10 @@ describe('Edge Case Detection', () => {
   });
 
   describe('Force Push', () => {
-    it('should detect force push flag', () => {
+    it('should detect force push', () => {
       const event = {
+        before: 'commit-before',
+        after: 'commit-after',
         forced: true
       };
 
@@ -31,6 +37,8 @@ describe('Edge Case Detection', () => {
 
     it('should detect normal push', () => {
       const event = {
+        before: 'commit-before',
+        after: 'commit-after',
         forced: false
       };
 

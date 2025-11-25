@@ -3,11 +3,18 @@ import { Logger } from '../utils/logger';
 
 const ZERO_SHA = '0000000000000000000000000000000000000000';
 
-export function isFirstCommit(event: any): boolean {
+// Add interface for push event
+interface PushEvent {
+  before: string;
+  after: string;
+  forced?: boolean;
+}
+
+export function isFirstCommit(event: PushEvent): boolean {
   return event.before === ZERO_SHA || event.before === '0'.repeat(40);
 }
 
-export function isForcePush(event: any): boolean {
+export function isForcePush(event: PushEvent): boolean {
   return event.forced === true;
 }
 

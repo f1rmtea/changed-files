@@ -1,5 +1,5 @@
 import { Minimatch } from 'minimatch';
-import { ChangedAreasConfig, ValidationResult, ValidationError, ValidationWarning } from '../types';
+import { ChangedAreasConfig, AreaConfig, ValidationResult, ValidationError, ValidationWarning } from '../types';
 
 export class ConfigValidator {
   private config: ChangedAreasConfig;
@@ -11,9 +11,22 @@ export class ConfigValidator {
   }
 
   validate(): ValidationResult {
+    this.errors = [];
+    this.warnings = [];
+
+    // First check if config has areas field
+    if (!this.config.areas) {
+      this.addError(null, null, 'Missing required "areas" field');
+      return {
+        valid: false,
+        errors: this.errors,
+        warnings: this.warnings
+      };
+    }
+
     this.validateSchema();
-    this.validateLogic();
     this.validatePatterns();
+    this.validateLogic();
 
     return {
       valid: this.errors.length === 0,
@@ -43,7 +56,7 @@ export class ConfigValidator {
     }
   }
 
-  private validateArea(name: string, config: any): void {
+  private validateArea(name: string, config: AreaConfig): void {
     // Check for spaces in area name
     if (/\s/.test(name)) {
       this.addError(
@@ -116,19 +129,21 @@ export class ConfigValidator {
       'exclude_binary_files',
       'ignore_deleted_files',
       'ignore_renamed_files'
-    ];
+    ] as const;
 
     for (const flag of booleanFlags) {
-      if (config[flag] !== undefined && typeof config[flag] !== 'boolean') {
+      const value = config[flag];
+      if (value !== undefined && typeof value !== 'boolean') {
         this.addError(name, flag, `"${flag}" must be true or false`);
       }
     }
   }
 
+  // ... rest of the file remains the same
   private validateLogic(): void {
     for (const [name, config] of Object.entries(this.config.areas)) {
       // Check: only excludes without includes
-      if ((config.exclude && config.exclude.length > 0) && (config.include && config.include.length === 0)) {
+      if ((config.exclude?.length ?? 0) > 0 && (config.include?.length ?? 0) === 0) {
         this.addError(
           name,
           null,
@@ -193,8 +208,8 @@ export class ConfigValidator {
     try {
       new Minimatch(pattern);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      this.addError(area, field, `Invalid glob pattern "${pattern}": ${errorMessage}`);
+      const err = error as Error;
+      this.addError(area, field, `Invalid glob pattern "${pattern}": ${err.message}`);
     }
 
     // Check for multiple consecutive slashes

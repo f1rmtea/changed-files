@@ -1,9 +1,11 @@
 # Dependencies
 node_modules/
 
-# Build output
-dist/
-build/
+# Build output (keep lib/, but dist/ must be committed for Actions)
+lib/
+
+# Test coverage
+coverage/
 
 # Environment variables
 .env

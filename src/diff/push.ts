@@ -12,50 +12,51 @@ async function sleep(ms: number): Promise<void> {
 }
 
 export async function getChangedFilesFromPush(
-  context: GitHubContext,
-  token: string,
-  baseRef: string,
-  headRef: string
-): Promise<ChangedFile[]> {
-  const octokit = getOctokit(token);
-  const { owner, repo } = context.repo;
-
-  Logger.info(`Fetching changed files: ${baseRef}...${headRef}`);
-
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    try {
-      const response = await octokit.rest.repos.compareCommitsWithBasehead({
-        owner,
-        repo,
-        basehead: `${baseRef}...${headRef}`,
-        per_page: 300
-      });
-
-      const files: ChangedFile[] = response.data.files?.map(file => ({
-        path: file.filename,
-        status: normalizeStatus(file.status),
-        previous_path: file.previous_filename,
-        binary: isBinaryFile(file.filename)
-      })) || [];
-
-      Logger.info(`Found ${files.length} changed file(s)`);
-      return files;
-
-    } catch (error: any) {
-      if (attempt < MAX_RETRIES - 1) {
-        Logger.warn(`API request failed (attempt ${attempt + 1}/${MAX_RETRIES}), retrying...`);
-        await sleep(RETRY_DELAY * (attempt + 1));
-      } else {
-        throw new GitHubAPIError(
-          `Failed to compare commits after ${MAX_RETRIES} attempts: ${error.message}`,
-          error.status
-        );
+    context: GitHubContext,
+    token: string,
+    baseRef: string,
+    headRef: string
+  ): Promise<ChangedFile[]> {
+    const octokit = getOctokit(token);
+    const { owner, repo } = context.repo;
+  
+    Logger.info(`Fetching changed files: ${baseRef}...${headRef}`);
+  
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      try {
+        const response = await octokit.rest.repos.compareCommitsWithBasehead({
+          owner,
+          repo,
+          basehead: `${baseRef}...${headRef}`,
+          per_page: 300
+        });
+  
+        const files: ChangedFile[] = response.data.files?.map(file => ({
+          path: file.filename,
+          status: normalizeStatus(file.status),
+          previous_path: file.previous_filename,
+          binary: isBinaryFile(file.filename)
+        })) || [];
+  
+        Logger.info(`Found ${files.length} changed file(s)`);
+        return files;
+  
+      } catch (error: unknown) {
+        if (attempt < MAX_RETRIES - 1) {
+          Logger.warn(`API request failed (attempt ${attempt + 1}/${MAX_RETRIES}), retrying...`);
+          await sleep(RETRY_DELAY * (attempt + 1));
+        } else {
+          const err = error as { message: string; status?: number };
+          throw new GitHubAPIError(
+            `Failed to compare commits after ${MAX_RETRIES} attempts: ${err.message}`,
+            err.status
+          );
+        }
       }
     }
+  
+    return [];
   }
-
-  return [];
-}
 
 function normalizeStatus(status: string): ChangedFile['status'] {
   switch (status) {

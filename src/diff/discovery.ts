@@ -25,7 +25,7 @@ export async function discoverChangedFiles(
 
   // Handle Push events
   if (eventName === 'push') {
-    const pushEvent = context.payload;
+    const pushEvent = context.payload as { before: string; after: string; forced?: boolean };
     
     // Check for first commit
     if (isFirstCommit(pushEvent)) {

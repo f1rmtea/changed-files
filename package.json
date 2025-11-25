@@ -1,5 +1,5 @@
 {
-  "name": "changed-areas-action",
+  "name": "changed-files",
   "version": "1.0.0",
   "description": "A production-ready GitHub Action for detecting changed files in monorepos",
   "main": "dist/index.js",
@@ -18,7 +18,7 @@
     "changed-files",
     "ci-cd"
   ],
-  "author": "Your Name",
+  "author": "Harsh",
   "license": "MIT",
   "dependencies": {
     "@actions/core": "^1.10.1",

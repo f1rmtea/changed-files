@@ -127,20 +127,24 @@ async function run(): Promise<void> {
 
     Logger.info(`✅ Successfully analyzed ${changedFiles.length} changed file(s)`);
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error as Error;
+
     if (error instanceof ConfigError) {
-      Logger.error(`Configuration error: ${error.message}`);
+      Logger.error(`Configuration error: ${err.message}`);
       core.setFailed('Invalid configuration');
     } else if (error instanceof GitHubAPIError) {
-      Logger.error(`GitHub API error: ${error.message}`);
+      Logger.error(`GitHub API error: ${err.message}`);
       core.setFailed('Failed to fetch changed files from GitHub');
     } else if (error instanceof ValidationError) {
-      Logger.error(`Validation error: ${error.message}`);
+      Logger.error(`Validation error: ${err.message}`);
       core.setFailed('Configuration validation failed');
     } else {
-      Logger.error(`Unexpected error: ${error.message}`);
-      Logger.error(error.stack);
-      core.setFailed(error.message);
+      Logger.error(`Unexpected error: ${err.message}`);
+      if (err.stack) {
+        Logger.error(err.stack);
+      }
+      core.setFailed(err.message);
     }
   }
 }
