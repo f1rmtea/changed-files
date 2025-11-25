@@ -1,0 +1,51 @@
+name: 'Changed Areas'
+description: 'Detect changed files and classify them into areas for monorepo CI/CD'
+author: 'Your Name'
+branding:
+  icon: 'git-branch'
+  color: 'blue'
+
+inputs:
+  config:
+    description: 'Path to config file (default: .github/changed-areas.yml)'
+    required: false
+    default: '.github/changed-areas.yml'
+  config_inline:
+    description: 'Inline YAML configuration (takes precedence over config file)'
+    required: false
+  github_token:
+    description: 'GitHub token for API access'
+    required: false
+    default: ${{ github.token }}
+  merge_commit_strategy:
+    description: 'Strategy for merge commits: first-parent | all-parents'
+    required: false
+    default: 'first-parent'
+  force_push_strategy:
+    description: 'Strategy for force pushes: compare-default-branch | all-files | fail'
+    required: false
+    default: 'compare-default-branch'
+  empty_commit_behavior:
+    description: 'Behavior for empty commits: none | all'
+    required: false
+    default: 'none'
+  ignore_binary_files:
+    description: 'Globally ignore binary files'
+    required: false
+    default: 'false'
+  strict_validation:
+    description: 'Treat configuration warnings as errors'
+    required: false
+    default: 'false'
+
+outputs:
+  areas_json:
+    description: 'JSON object with all area results'
+  # Dynamic outputs will be set for each area:
+  # {area_name}_changed: "true" | "false"
+  # {area_name}_files: "file1\nfile2\n..."
+  # {area_name}_count: "3"
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'

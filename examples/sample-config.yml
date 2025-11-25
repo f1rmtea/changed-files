@@ -1,0 +1,37 @@
+areas:
+  backend:
+    include:
+      - "src/backend/**"
+      - "src/api/**"
+    exclude:
+      - "**/*.test.ts"
+      - "**/*.spec.ts"
+    required_extensions: [".ts", ".tsx"]
+    exclude_binary_files: true
+    min_changed_files: 1
+
+  frontend:
+    include:
+      - "src/components/**"
+      - "src/pages/**"
+      - "public/**"
+    exclude:
+      - "**/*.test.tsx"
+      - "**/*.stories.tsx"
+    required_extensions: [".tsx", ".ts", ".css", ".scss"]
+
+  infrastructure:
+    include:
+      - "terraform/**"
+      - ".github/workflows/**"
+      - "docker/**"
+      - "kubernetes/**"
+    min_changed_files: 1
+
+  documentation:
+    include:
+      - "docs/**"
+      - "*.md"
+      - "README.md"
+    required_extensions: [".md", ".mdx"]
+    ignore_deleted_files: false

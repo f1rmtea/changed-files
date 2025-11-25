@@ -1,0 +1,32 @@
+name: Test Action
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-action:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Test action
+        id: test
+        uses: ./
+        with:
+          config_inline: |
+            areas:
+              backend:
+                include:
+                  - "src/**/*.ts"
+                exclude:
+                  - "**/*.test.ts"
+              docs:
+                include:
+                  - "**.md"
+      
+      - name: Check outputs
+        run: |
+          echo "Backend changed: ${{ steps.test.outputs.backend_changed }}"
+          echo "Docs changed: ${{ steps.test.outputs.docs_changed }}"
+          echo "JSON: ${{ steps.test.outputs.areas_json }}"
