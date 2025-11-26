@@ -44,7 +44,8 @@ areas:
           force_push_strategy: 'compare-default-branch',
           empty_commit_behavior: 'none',
           ignore_binary_files: false,
-          strict_validation: false
+          strict_validation: false,
+          debug: false
         }
       };
 
@@ -68,7 +69,8 @@ invalid yaml:
           force_push_strategy: 'compare-default-branch',
           empty_commit_behavior: 'none',
           ignore_binary_files: false,
-          strict_validation: false
+          strict_validation: false,
+          debug: false
         }
       };
 
@@ -91,7 +93,8 @@ areas:
           force_push_strategy: 'compare-default-branch',
           empty_commit_behavior: 'none',
           ignore_binary_files: false,
-          strict_validation: false
+          strict_validation: false,
+          debug: false
         }
       };
 
@@ -112,7 +115,8 @@ areas:
           force_push_strategy: 'compare-default-branch',
           empty_commit_behavior: 'none',
           ignore_binary_files: false,
-          strict_validation: false
+          strict_validation: false,
+          debug: false
         }
       };
 
@@ -148,7 +152,8 @@ areas:
           force_push_strategy: 'compare-default-branch',
           empty_commit_behavior: 'none',
           ignore_binary_files: false,
-          strict_validation: false
+          strict_validation: false,
+          debug: false
         }
       };
 
@@ -170,7 +175,8 @@ areas:
           force_push_strategy: 'compare-default-branch',
           empty_commit_behavior: 'none',
           ignore_binary_files: false,
-          strict_validation: false
+          strict_validation: false,
+          debug: false
         }
       };
 

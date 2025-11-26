@@ -25,6 +25,7 @@ export interface EdgeCaseConfig {
   empty_commit_behavior: 'none' | 'all';
   ignore_binary_files: boolean;
   strict_validation: boolean;
+  debug: boolean;
 }
 
 export interface ChangedFile {

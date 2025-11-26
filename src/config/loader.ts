@@ -15,7 +15,8 @@ export function getActionInputs(): ActionInputs {
       force_push_strategy: (core.getInput('force_push_strategy') as 'compare-default-branch' | 'all-files' | 'fail') || 'compare-default-branch',
       empty_commit_behavior: (core.getInput('empty_commit_behavior') as 'none' | 'all') || 'none',
       ignore_binary_files: core.getInput('ignore_binary_files') === 'true',
-      strict_validation: core.getInput('strict_validation') === 'true'
+      strict_validation: core.getInput('strict_validation') === 'true',
+      debug: core.getInput('debug') === 'true'
     }
   };
 }

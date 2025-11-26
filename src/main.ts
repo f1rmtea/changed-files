@@ -90,7 +90,7 @@ async function run(): Promise<void> {
 
     // 7. Classify files (works for both areas and files section)
     Logger.startGroup('Classifying files');
-    const classified = classifyFiles(changedFiles, allAreas);
+    const classified = classifyFiles(changedFiles, allAreas, inputs.edge_cases.debug);
 
     for (const [name, files] of Object.entries(classified)) {
       if (files.length > 0) {
