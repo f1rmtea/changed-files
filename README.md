@@ -7,8 +7,9 @@ A GitHub Action for detecting changed files with flexible configuration - use si
 Changed Files provides flexible file change detection for CI/CD workflows through a unified configuration approach:
 
 - Use **`files:`** for simple file pattern matching
-- Use **`areas:`** for organizing files into logical areas  
+- Use **`areas:`** for organizing files into logical areas
 - Use **both together** in a single configuration
+- Enable **`debug: true`** for detailed troubleshooting that shows exactly why each file matched or was excluded
 
 All configurations use consistent YAML syntax and handle Git edge cases (first commits, force pushes, empty commits, merge commits) with support for binary file detection, file extension filtering, and comprehensive validation.
 
@@ -214,6 +215,7 @@ Both `files` and each area support these options:
 | `empty_commit_behavior` | No | `none` | `none` or `all` |
 | `ignore_binary_files` | No | `false` | Globally ignore binary files (overrides per-area settings) |
 | `strict_validation` | No | `false` | Treat configuration warnings as errors |
+| `debug` | No | `false` | Enable detailed debug logging showing why each file matched or was excluded |
 
 ## Action Outputs
 
@@ -500,6 +502,50 @@ jobs:
 
 ## Troubleshooting
 
+### Debug Mode
+
+Enable detailed debug logging to see exactly why each file matched or was excluded:
+
+```yaml
+- uses: f1rmtea/changed-files@main
+  with:
+    debug: true
+    config_inline: |
+      areas:
+        backend:
+          include:
+            - "src/backend/**"
+          exclude:
+            - "**/*.test.ts"
+        python:
+          include:
+            - "**"
+          required_extensions:
+            - ".py"
+```
+
+**Debug output shows:**
+- Which include pattern matched (or why it didn't match)
+- Whether exclude patterns matched
+- Extension filtering decisions with actual file extensions
+- Binary file, deleted file, and renamed file filtering
+- Final match status for each file
+
+**Example debug output:**
+```
+[backend] src/backend/user.ts matched include "src/backend/**"
+[backend] src/backend/user.ts did not match any exclude
+[backend] src/backend/user.ts ✓ matched
+
+[backend] src/backend/api.test.ts matched include "src/backend/**"
+[backend] src/backend/api.test.ts matched exclude "**/*.test.ts"
+
+[python] requirements.txt matched include "**"
+[python] requirements.txt ignored (extension ".txt" not in required_extensions [.py, .pyx])
+```
+
+See [examples/debug-mode.yml](examples/debug-mode.yml) for a complete example.
+
 ### Configuration Not Found
 
 Ensure the configuration file exists or use inline configuration:
@@ -517,12 +563,13 @@ Check that:
 2. `fetch-depth: 0` is set in checkout step
 3. Patterns match actual file paths in repository
 
-Debug by listing all changed files:
+Enable debug mode to see why files aren't matching:
 
 ```yaml
 - uses: f1rmtea/changed-files@main
   id: debug
   with:
+    debug: true
     config_inline: |
       files:
         include:
