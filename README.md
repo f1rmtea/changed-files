@@ -212,6 +212,7 @@ Both `files` and each area support these options:
 | `empty_commit_behavior` | No | `none` | `none` or `all` |
 | `ignore_binary_files` | No | `false` | Globally ignore binary files (overrides per-area settings) |
 | `strict_validation` | No | `false` | Treat configuration warnings as errors |
+| `debug` | No | `false` | Enable debug mode to show detailed matching decisions for each file |
 
 ## Action Outputs
 
@@ -494,6 +495,61 @@ jobs:
       - run: docker-compose build
 ```
 
+## Debug Mode
+
+Enable debug mode to see detailed matching decisions for every file. This feature provides unique visibility into why files matched or didn't match your patterns, making troubleshooting dramatically easier.
+
+### Enabling Debug Mode
+
+```yaml
+- uses: f1rmtea/changed-files@main
+  with:
+    debug: true
+    config_inline: |
+      areas:
+        backend:
+          include:
+            - "src/backend/**"
+          exclude:
+            - "**/*.test.ts"
+          required_extensions: [".ts", ".tsx"]
+        python:
+          include:
+            - "**/*.py"
+```
+
+### Example Debug Output
+
+When debug mode is enabled, the action prints detailed information for each file:
+
+```
+[backend] src/backend/user.ts matched include "src/backend/**"
+[backend] src/backend/user.ts did not match any exclude patterns
+[backend] Matched 1 file(s)
+
+[backend] src/backend/api.test.ts matched include "src/backend/**"
+[backend] src/backend/api.test.ts excluded by "**/*.test.ts"
+
+[python] requirements.txt matched include "**/*.py"
+[python] requirements.txt ignored (extension ".txt" not in required_extensions)
+
+[python] scripts/deploy.py matched include "**/*.py"
+[python] scripts/deploy.py did not match any exclude patterns
+[python] Matched 1 file(s)
+```
+
+### What Debug Mode Shows
+
+For each file and area combination, debug mode explains:
+
+- **Which include pattern matched** - Shows the exact pattern that matched the file
+- **Exclude behavior** - Shows if the file was excluded and which pattern excluded it
+- **Extension filtering** - Shows when files are ignored due to `required_extensions`
+- **Binary file handling** - Shows when files are ignored due to `exclude_binary_files`
+- **Deleted file handling** - Shows when files are ignored due to `ignore_deleted_files`
+- **Renamed file handling** - Shows when pure renames are ignored due to `ignore_renamed_files`
+- **No match explanation** - Shows when files don't match any include patterns
+
 ## Troubleshooting
 
 ### Configuration Not Found
@@ -512,18 +568,17 @@ Check that:
 1. Patterns use correct glob syntax
 2. Patterns match actual file paths in repository
 
-Debug by listing all changed files:
+Enable debug mode to see detailed matching information:
 
 ```yaml
 - uses: f1rmtea/changed-files@main
   id: debug
   with:
+    debug: true
     config_inline: |
       files:
         include:
           - "**/*"
-
-- run: echo "${{ steps.debug.outputs.files_files }}"
 ```
 
 ### Binary Files Not Excluded
