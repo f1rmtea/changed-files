@@ -89,12 +89,20 @@ async function run(): Promise<void> {
     }
 
     // 7. Classify files (works for both areas and files section)
-    Logger.startGroup('Classifying files');
-    const classified = classifyFiles(changedFiles, allAreas);
+    if (inputs.debug) {
+      Logger.startGroup('Debug: File Classification Details');
+      Logger.info('Debug mode enabled - showing detailed matching logic for each file');
+    } else {
+      Logger.startGroup('Classifying files');
+    }
 
-    for (const [name, files] of Object.entries(classified)) {
-      if (files.length > 0) {
-        Logger.info(`[${name}] Matched ${files.length} file(s)`);
+    const classified = classifyFiles(changedFiles, allAreas, inputs.debug);
+
+    if (!inputs.debug) {
+      for (const [name, files] of Object.entries(classified)) {
+        if (files.length > 0) {
+          Logger.info(`[${name}] Matched ${files.length} file(s)`);
+        }
       }
     }
     Logger.endGroup();

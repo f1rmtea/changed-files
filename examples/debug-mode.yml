@@ -1,0 +1,55 @@
+name: Debug Mode Example
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  analyze-changes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed areas with debug mode enabled
+        uses: ./
+        with:
+          debug: true
+          config_inline: |
+            areas:
+              backend:
+                include:
+                  - "src/backend/**"
+                exclude:
+                  - "**/*.test.ts"
+              frontend:
+                include:
+                  - "src/frontend/**"
+              python:
+                include:
+                  - "**"
+                required_extensions:
+                  - ".py"
+                  - ".pyx"
+
+# Debug mode output example:
+#
+# Debug: File Classification Details
+#   Debug mode enabled - showing detailed matching logic for each file
+#   [backend] src/backend/user.ts matched include "src/backend/**"
+#   [backend] src/backend/user.ts did not match any exclude
+#   [backend] src/backend/user.ts ✓ matched
+#   [backend] src/backend/api.test.ts matched include "src/backend/**"
+#   [backend] src/backend/api.test.ts matched exclude "**/*.test.ts"
+#   [frontend] src/backend/user.ts did not match any include patterns [src/frontend/**]
+#   [frontend] src/frontend/app.tsx matched include "src/frontend/**"
+#   [frontend] src/frontend/app.tsx no exclude patterns configured
+#   [frontend] src/frontend/app.tsx ✓ matched
+#   [python] requirements.txt matched include "**"
+#   [python] requirements.txt no exclude patterns configured
+#   [python] requirements.txt ignored (extension ".txt" not in required_extensions [.py, .pyx])
+#   [python] src/script.py matched include "**"
+#   [python] src/script.py no exclude patterns configured
+#   [python] src/script.py extension ".py" is in required_extensions
+#   [python] src/script.py ✓ matched

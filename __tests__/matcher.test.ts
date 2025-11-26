@@ -1,5 +1,6 @@
-import { classifyFile } from '../src/classify/matcher';
+import { classifyFile, classifyFiles } from '../src/classify/matcher';
 import { ChangedFile, AreaConfig } from '../src/types';
+import { Logger } from '../src/utils/logger';
 
 describe('File Matcher', () => {
   describe('Include patterns', () => {
@@ -149,6 +150,140 @@ describe('File Matcher', () => {
       };
 
       expect(classifyFile(file, config)).toBe(false);
+    });
+  });
+
+  describe('Debug mode', () => {
+    let infoSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      infoSpy = jest.spyOn(Logger, 'info').mockImplementation();
+    });
+
+    afterEach(() => {
+      infoSpy.mockRestore();
+    });
+
+    it('should log debug messages when debug is enabled', () => {
+      const file: ChangedFile = {
+        path: 'src/backend/user.ts',
+        status: 'modified',
+        binary: false
+      };
+
+      const config: AreaConfig = {
+        include: ['src/backend/**'],
+        exclude: ['**/*.test.ts']
+      };
+
+      const debugCtx = { areaName: 'backend', debugEnabled: true };
+      classifyFile(file, config, debugCtx);
+
+      expect(infoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[backend] src/backend/user.ts matched include "src/backend/**"')
+      );
+      expect(infoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[backend] src/backend/user.ts did not match any exclude')
+      );
+      expect(infoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[backend] src/backend/user.ts ✓ matched')
+      );
+    });
+
+    it('should not log debug messages when debug is disabled', () => {
+      const file: ChangedFile = {
+        path: 'src/backend/user.ts',
+        status: 'modified',
+        binary: false
+      };
+
+      const config: AreaConfig = {
+        include: ['src/backend/**']
+      };
+
+      classifyFile(file, config);
+
+      expect(infoSpy).not.toHaveBeenCalled();
+    });
+
+    it('should log when file does not match include patterns', () => {
+      const file: ChangedFile = {
+        path: 'requirements.txt',
+        status: 'modified',
+        binary: false
+      };
+
+      const config: AreaConfig = {
+        include: ['src/backend/**']
+      };
+
+      const debugCtx = { areaName: 'backend', debugEnabled: true };
+      classifyFile(file, config, debugCtx);
+
+      expect(infoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[backend] requirements.txt did not match any include patterns')
+      );
+    });
+
+    it('should log when file is ignored due to required_extensions', () => {
+      const file: ChangedFile = {
+        path: 'requirements.txt',
+        status: 'modified',
+        binary: false
+      };
+
+      const config: AreaConfig = {
+        include: ['**'],
+        required_extensions: ['.py', '.pyx']
+      };
+
+      const debugCtx = { areaName: 'python', debugEnabled: true };
+      classifyFile(file, config, debugCtx);
+
+      expect(infoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[python] requirements.txt ignored (extension ".txt" not in required_extensions')
+      );
+    });
+
+    it('should log when file matches exclude pattern', () => {
+      const file: ChangedFile = {
+        path: 'src/backend/api.test.ts',
+        status: 'modified',
+        binary: false
+      };
+
+      const config: AreaConfig = {
+        include: ['src/backend/**'],
+        exclude: ['**/*.test.ts']
+      };
+
+      const debugCtx = { areaName: 'backend', debugEnabled: true };
+      classifyFile(file, config, debugCtx);
+
+      expect(infoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[backend] src/backend/api.test.ts matched exclude "**/*.test.ts"')
+      );
+    });
+
+    it('should work with classifyFiles function', () => {
+      const files: ChangedFile[] = [
+        { path: 'src/backend/user.ts', status: 'modified', binary: false },
+        { path: 'requirements.txt', status: 'modified', binary: false }
+      ];
+
+      const areas = {
+        backend: { include: ['src/backend/**'] },
+        python: { include: ['**'], required_extensions: ['.py'] }
+      };
+
+      classifyFiles(files, areas, true);
+
+      expect(infoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[backend] src/backend/user.ts matched include')
+      );
+      expect(infoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[python] requirements.txt ignored (extension')
+      );
     });
   });
 });

@@ -67,6 +67,7 @@ export interface ActionInputs {
   config_inline?: string;
   github_token: string;
   edge_cases: EdgeCaseConfig;
+  debug: boolean;
 }
 
 export type GitHubContext = Context;

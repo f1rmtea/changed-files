@@ -45,7 +45,8 @@ areas:
           empty_commit_behavior: 'none',
           ignore_binary_files: false,
           strict_validation: false
-        }
+        },
+        debug: false
       };
 
       const config = await loadConfig(inputs);
@@ -69,7 +70,8 @@ invalid yaml:
           empty_commit_behavior: 'none',
           ignore_binary_files: false,
           strict_validation: false
-        }
+        },
+        debug: false
       };
 
       await expect(loadConfig(inputs)).rejects.toThrow(ConfigError);
@@ -92,7 +94,8 @@ areas:
           empty_commit_behavior: 'none',
           ignore_binary_files: false,
           strict_validation: false
-        }
+        },
+        debug: false
       };
 
       const config = await loadConfig(inputs);
@@ -113,7 +116,8 @@ areas:
           empty_commit_behavior: 'none',
           ignore_binary_files: false,
           strict_validation: false
-        }
+        },
+        debug: false
       };
 
       const fileContent = `
@@ -149,7 +153,8 @@ areas:
           empty_commit_behavior: 'none',
           ignore_binary_files: false,
           strict_validation: false
-        }
+        },
+        debug: false
       };
 
       // Make sure existsSync returns false for this test
@@ -171,7 +176,8 @@ areas:
           empty_commit_behavior: 'none',
           ignore_binary_files: false,
           strict_validation: false
-        }
+        },
+        debug: false
       };
 
       (fs.existsSync as jest.Mock).mockReturnValue(true);

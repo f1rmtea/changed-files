@@ -16,7 +16,8 @@ export function getActionInputs(): ActionInputs {
       empty_commit_behavior: (core.getInput('empty_commit_behavior') as 'none' | 'all') || 'none',
       ignore_binary_files: core.getInput('ignore_binary_files') === 'true',
       strict_validation: core.getInput('strict_validation') === 'true'
-    }
+    },
+    debug: core.getInput('debug') === 'true'
   };
 }
 

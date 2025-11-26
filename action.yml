@@ -57,6 +57,10 @@ inputs:
     description: 'Treat configuration warnings as errors'
     required: false
     default: 'false'
+  debug:
+    description: 'Enable detailed debug logging showing why each file matched or was excluded'
+    required: false
+    default: 'false'
 
 outputs:
   areas_json:

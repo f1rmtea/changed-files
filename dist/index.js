@@ -34397,42 +34397,94 @@ exports.classifyFile = classifyFile;
 exports.classifyFiles = classifyFiles;
 const minimatch_1 = __nccwpck_require__(6507);
 const path = __importStar(__nccwpck_require__(6928));
-// Logger is not currently used
-function classifyFile(file, areaConfig) {
+const logger_1 = __nccwpck_require__(7893);
+function logDebug(ctx, file, message) {
+    if (ctx.debugEnabled) {
+        logger_1.Logger.info(`[${ctx.areaName}] ${file.path} ${message}`);
+    }
+}
+function classifyFile(file, areaConfig, debugCtx) {
     // Step 1: Check if matches ANY include pattern
-    const matchesInclude = areaConfig.include.some(pattern => (0, minimatch_1.minimatch)(file.path, pattern, { dot: true }));
+    let matchedIncludePattern;
+    const matchesInclude = areaConfig.include.some(pattern => {
+        const matches = (0, minimatch_1.minimatch)(file.path, pattern, { dot: true });
+        if (matches) {
+            matchedIncludePattern = pattern;
+        }
+        return matches;
+    });
     if (!matchesInclude) {
+        if (debugCtx) {
+            logDebug(debugCtx, file, `did not match any include patterns [${areaConfig.include.join(', ')}]`);
+        }
         return false;
+    }
+    if (debugCtx) {
+        logDebug(debugCtx, file, `matched include "${matchedIncludePattern}"`);
     }
     // Step 2: Check if matches ANY exclude pattern
     if (areaConfig.exclude && areaConfig.exclude.length > 0) {
-        const matchesExclude = areaConfig.exclude.some(pattern => (0, minimatch_1.minimatch)(file.path, pattern, { dot: true }));
+        let matchedExcludePattern;
+        const matchesExclude = areaConfig.exclude.some(pattern => {
+            const matches = (0, minimatch_1.minimatch)(file.path, pattern, { dot: true });
+            if (matches) {
+                matchedExcludePattern = pattern;
+            }
+            return matches;
+        });
         if (matchesExclude) {
+            if (debugCtx) {
+                logDebug(debugCtx, file, `matched exclude "${matchedExcludePattern}"`);
+            }
             return false;
         }
+        if (debugCtx) {
+            logDebug(debugCtx, file, 'did not match any exclude');
+        }
+    }
+    else if (debugCtx) {
+        logDebug(debugCtx, file, 'no exclude patterns configured');
     }
     // Step 3: Check required_extensions
     if (areaConfig.required_extensions && areaConfig.required_extensions.length > 0) {
         const fileExt = path.extname(file.path);
         if (!areaConfig.required_extensions.includes(fileExt)) {
+            if (debugCtx) {
+                logDebug(debugCtx, file, `ignored (extension "${fileExt || '(none)'}" not in required_extensions [${areaConfig.required_extensions.join(', ')}])`);
+            }
             return false;
+        }
+        if (debugCtx) {
+            logDebug(debugCtx, file, `extension "${fileExt}" is in required_extensions`);
         }
     }
     // Step 4: Check exclude_binary_files
     if (areaConfig.exclude_binary_files && file.binary) {
+        if (debugCtx) {
+            logDebug(debugCtx, file, 'ignored (binary file and exclude_binary_files is true)');
+        }
         return false;
     }
     // Step 5: Check ignore_deleted_files
     if (areaConfig.ignore_deleted_files && file.status === 'removed') {
+        if (debugCtx) {
+            logDebug(debugCtx, file, 'ignored (deleted file and ignore_deleted_files is true)');
+        }
         return false;
     }
     // Step 6: Check ignore_renamed_files
     if (areaConfig.ignore_renamed_files && file.status === 'renamed') {
+        if (debugCtx) {
+            logDebug(debugCtx, file, 'ignored (renamed file and ignore_renamed_files is true)');
+        }
         return false;
+    }
+    if (debugCtx) {
+        logDebug(debugCtx, file, '✓ matched');
     }
     return true;
 }
-function classifyFiles(files, areas) {
+function classifyFiles(files, areas, debugEnabled = false) {
     const results = {};
     // Initialize all areas
     for (const areaName of Object.keys(areas)) {
@@ -34441,7 +34493,8 @@ function classifyFiles(files, areas) {
     // Classify each file
     for (const file of files) {
         for (const [areaName, areaConfig] of Object.entries(areas)) {
-            if (classifyFile(file, areaConfig)) {
+            const debugCtx = { areaName, debugEnabled };
+            if (classifyFile(file, areaConfig, debugCtx)) {
                 results[areaName].push(file);
             }
         }
@@ -34510,7 +34563,8 @@ function getActionInputs() {
             empty_commit_behavior: core.getInput('empty_commit_behavior') || 'none',
             ignore_binary_files: core.getInput('ignore_binary_files') === 'true',
             strict_validation: core.getInput('strict_validation') === 'true'
-        }
+        },
+        debug: core.getInput('debug') === 'true'
     };
 }
 async function loadConfig(inputs) {
@@ -35188,11 +35242,19 @@ async function run() {
             return;
         }
         // 7. Classify files (works for both areas and files section)
-        logger_1.Logger.startGroup('Classifying files');
-        const classified = (0, matcher_1.classifyFiles)(changedFiles, allAreas);
-        for (const [name, files] of Object.entries(classified)) {
-            if (files.length > 0) {
-                logger_1.Logger.info(`[${name}] Matched ${files.length} file(s)`);
+        if (inputs.debug) {
+            logger_1.Logger.startGroup('Debug: File Classification Details');
+            logger_1.Logger.info('Debug mode enabled - showing detailed matching logic for each file');
+        }
+        else {
+            logger_1.Logger.startGroup('Classifying files');
+        }
+        const classified = (0, matcher_1.classifyFiles)(changedFiles, allAreas, inputs.debug);
+        if (!inputs.debug) {
+            for (const [name, files] of Object.entries(classified)) {
+                if (files.length > 0) {
+                    logger_1.Logger.info(`[${name}] Matched ${files.length} file(s)`);
+                }
             }
         }
         logger_1.Logger.endGroup();
