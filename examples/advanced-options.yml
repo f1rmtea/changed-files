@@ -1,0 +1,42 @@
+name: Advanced Options
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check-changes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Detect TypeScript changes with advanced options
+        id: typescript
+        uses: f1rmtea/changed-files@main
+        with:
+          config_inline: |
+            files:
+              include:
+                - "src/**/*.ts"
+                - "src/**/*.tsx"
+              exclude:
+                - "**/*.test.ts"
+                - "**/*.spec.ts"
+                - "**/__tests__/**"
+              required_extensions: [".ts", ".tsx"]
+              exclude_binary_files: true
+              min_changed_files: 2
+              ignore_deleted_files: false
+              ignore_renamed_files: false
+      
+      - name: Run TypeScript checks
+        if: steps.typescript.outputs.files_changed == 'true'
+        run: |
+          echo "Found ${{ steps.typescript.outputs.files_count }} TypeScript files"
+          echo "Changed files:"
+          echo "${{ steps.typescript.outputs.files_files }}"
+          npm run type-check
+          npm run lint

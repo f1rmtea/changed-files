@@ -14,6 +14,11 @@ export interface ChangedAreasConfig {
   areas: Record<string, AreaConfig>;
 }
 
+export interface UnifiedConfig {
+  areas?: Record<string, AreaConfig>;
+  files?: AreaConfig;
+}
+
 export interface EdgeCaseConfig {
   merge_commit_strategy: 'first-parent' | 'all-parents';
   force_push_strategy: 'compare-default-branch' | 'all-files' | 'fail';

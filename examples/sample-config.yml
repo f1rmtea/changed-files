@@ -1,3 +1,5 @@
+# Complete configuration example showing all available options
+
 areas:
   backend:
     include:
@@ -8,9 +10,11 @@ areas:
       - "**/*.test.ts"
       - "**/*.spec.ts"
       - "**/fixtures/**"
-    required_extensions: [".ts", ".tsx"]
+    required_extensions: [".ts", ".tsx", ".js"]
     exclude_binary_files: true
     min_changed_files: 1
+    ignore_deleted_files: false
+    ignore_renamed_files: true
 
   frontend:
     include:
@@ -21,20 +25,36 @@ areas:
       - "**/*.test.tsx"
       - "**/*.stories.tsx"
     required_extensions: [".tsx", ".ts", ".css", ".scss"]
-    ignore_deleted_files: false
+    exclude_binary_files: false
+    min_changed_files: 1
 
   infrastructure:
     include:
       - "terraform/**"
       - ".github/workflows/**"
-      - "docker/**"
       - "kubernetes/**"
+      - "docker/**"
+    # No exclusions
+    # Any file type accepted
     min_changed_files: 1
 
   documentation:
     include:
       - "docs/**"
-      - "README.md"
       - "*.md"
+      - "README.md"
     required_extensions: [".md", ".mdx"]
     ignore_deleted_files: false
+
+# Special files section - treated as a reserved area
+files:
+  include:
+    - "Dockerfile"
+    - "docker-compose.yml"
+    - ".dockerignore"
+    - "package.json"
+    - "package-lock.json"
+    - "yarn.lock"
+  # Can use all the same options as areas
+  exclude_binary_files: false
+  min_changed_files: 1

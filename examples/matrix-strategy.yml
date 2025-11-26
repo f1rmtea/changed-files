@@ -1,0 +1,59 @@
+name: Matrix Strategy
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.changes.outputs.areas_json }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Detect changes
+        id: changes
+        uses: f1rmtea/changed-files@main
+        with:
+          config_inline: |
+            areas:
+              backend:
+                include:
+                  - "src/backend/**"
+              frontend:
+                include:
+                  - "src/frontend/**"
+              api:
+                include:
+                  - "src/api/**"
+              workers:
+                include:
+                  - "src/workers/**"
+
+  test:
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        area: [backend, frontend, api, workers]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check if area changed
+        id: check
+        run: |
+          MATRIX='${{ needs.detect-changes.outputs.matrix }}'
+          CHANGED=$(echo $MATRIX | jq -r '."${{ matrix.area }}".changed')
+          echo "changed=$CHANGED" >> $GITHUB_OUTPUT
+      
+      - name: Install dependencies
+        if: steps.check.outputs.changed == 'true'
+        run: npm install
+      
+      - name: Run tests for ${{ matrix.area }}
+        if: steps.check.outputs.changed == 'true'
+        run: npm run test:${{ matrix.area }}

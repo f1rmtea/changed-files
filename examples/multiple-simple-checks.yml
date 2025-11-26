@@ -1,0 +1,47 @@
+name: Multiple File Checks
+
+on:
+  pull_request:
+  push:
+    branches: [main, develop]
+
+jobs:
+  check-changes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Check Python files
+        id: python
+        uses: f1rmtea/changed-files@main
+        with:
+          config_inline: |
+            files:
+              include:
+                - "**/*.py"
+              exclude:
+                - "**/__pycache__/**"
+                - "**/*.pyc"
+
+      - name: Check TypeScript files
+        id: typescript
+        uses: f1rmtea/changed-files@main
+        with:
+          config_inline: |
+            files:
+              include:
+                - "**/*.ts"
+                - "**/*.tsx"
+              exclude:
+                - "**/*.test.ts"
+                - "**/*.spec.ts"
+
+      - name: Run Python tests
+        if: steps.python.outputs.files_changed == 'true'
+        run: pytest
+
+      - name: Run TypeScript tests
+        if: steps.typescript.outputs.files_changed == 'true'
+        run: npm test

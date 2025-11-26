@@ -51,8 +51,8 @@ areas:
       const config = await loadConfig(inputs);
 
       expect(config.areas).toBeDefined();
-      expect(config.areas.backend).toBeDefined();
-      expect(config.areas.backend.include).toEqual(['src/**/*.ts']);
+      expect(config.areas!.backend).toBeDefined();
+      expect(config.areas!.backend.include).toEqual(['src/**/*.ts']);
     });
 
     it('should throw ConfigError for invalid inline YAML', async () => {
@@ -97,7 +97,7 @@ areas:
 
       const config = await loadConfig(inputs);
 
-      expect(config.areas.backend.include).toEqual(['inline/**']);
+      expect(config.areas!.backend.include).toEqual(['inline/**']);
       expect(fs.existsSync).not.toHaveBeenCalled();
     });
   });
@@ -136,7 +136,7 @@ areas:
 
       expect(mockExistsSync).toHaveBeenCalledWith('.github/changed-areas.yml');
       expect(mockReadFileSync).toHaveBeenCalledWith('.github/changed-areas.yml', 'utf8');
-      expect(config.areas.backend.include).toEqual(['src/**/*.ts']);
+      expect(config.areas!.backend.include).toEqual(['src/**/*.ts']);
     });
 
     it('should throw ConfigError when config file does not exist', async () => {

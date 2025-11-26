@@ -1,0 +1,78 @@
+name: Monorepo CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, develop]
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.changes.outputs.backend_changed }}
+      frontend: ${{ steps.changes.outputs.frontend_changed }}
+      infrastructure: ${{ steps.changes.outputs.infrastructure_changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Detect changed areas
+        id: changes
+        uses: f1rmtea/changed-files@main
+        with:
+          config_inline: |
+            areas:
+              backend:
+                include:
+                  - "src/backend/**"
+                  - "src/api/**"
+                exclude:
+                  - "**/*.test.ts"
+                required_extensions: [".ts", ".js"]
+              
+              frontend:
+                include:
+                  - "src/frontend/**"
+                  - "src/components/**"
+                exclude:
+                  - "**/*.stories.tsx"
+                  - "**/*.test.tsx"
+                required_extensions: [".tsx", ".ts", ".css"]
+              
+              infrastructure:
+                include:
+                  - "terraform/**"
+                  - ".github/workflows/**"
+                  - "kubernetes/**"
+
+  test-backend:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: npm install
+      - name: Run backend tests
+        run: npm test -- backend
+
+  test-frontend:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: npm install
+      - name: Run frontend tests
+        run: npm test -- frontend
+
+  terraform-plan:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.infrastructure == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Terraform Plan
+        run: terraform plan

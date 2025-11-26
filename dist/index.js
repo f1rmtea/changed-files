@@ -34493,6 +34493,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.getActionInputs = getActionInputs;
 exports.loadConfig = loadConfig;
+exports.mergeConfigSections = mergeConfigSections;
 const core = __importStar(__nccwpck_require__(7484));
 const fs = __importStar(__nccwpck_require__(9896));
 const yaml = __importStar(__nccwpck_require__(4281));
@@ -34513,123 +34514,215 @@ function getActionInputs() {
     };
 }
 async function loadConfig(inputs) {
+    let rawConfig;
     // Priority 1: Inline config
     if (inputs.config_inline) {
         logger_1.Logger.info('Loading configuration from inline input');
         try {
-            const config = yaml.load(inputs.config_inline);
-            return config;
+            rawConfig = yaml.load(inputs.config_inline);
         }
         catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             throw new errors_1.ConfigError(`Failed to parse inline configuration: ${errorMessage}`);
         }
     }
-    // Priority 2: Config file
-    logger_1.Logger.info(`Loading configuration from file: ${inputs.config}`);
-    if (!fs.existsSync(inputs.config)) {
-        throw new errors_1.ConfigError(`Configuration file not found: ${inputs.config}\n` +
-            `Please create this file or provide inline configuration using the 'config_inline' input.`);
+    else {
+        // Priority 2: Config file
+        logger_1.Logger.info(`Loading configuration from file: ${inputs.config}`);
+        if (!fs.existsSync(inputs.config)) {
+            throw new errors_1.ConfigError(`Configuration file not found: ${inputs.config}\n` +
+                `Please create this file or provide inline configuration using the 'config_inline' input.`);
+        }
+        try {
+            const fileContents = fs.readFileSync(inputs.config, 'utf8');
+            rawConfig = yaml.load(fileContents);
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            throw new errors_1.ConfigError(`Failed to parse configuration file: ${errorMessage}`);
+        }
     }
-    try {
-        const fileContents = fs.readFileSync(inputs.config, 'utf8');
-        const config = yaml.load(fileContents);
-        return config;
+    return rawConfig;
+}
+function mergeConfigSections(config) {
+    const allAreas = {};
+    // Merge areas section if present
+    if (config.areas) {
+        Object.assign(allAreas, config.areas);
     }
-    catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        throw new errors_1.ConfigError(`Failed to parse configuration file: ${errorMessage}`);
+    // Add files section as special area if present
+    if (config.files) {
+        allAreas['files'] = config.files;
     }
+    // Validate we have at least one section
+    if (Object.keys(allAreas).length === 0) {
+        throw new errors_1.ConfigError('Configuration must contain at least one of: "areas" or "files"\n' +
+            'Example:\n' +
+            '  files:\n' +
+            '    include: ["src/**"]\n' +
+            'Or:\n' +
+            '  areas:\n' +
+            '    backend:\n' +
+            '      include: ["src/**"]');
+    }
+    return allAreas;
 }
 
 
 /***/ }),
 
 /***/ 2572:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+/***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.ConfigValidator = void 0;
-const minimatch_1 = __nccwpck_require__(6507);
 class ConfigValidator {
     config;
-    errors = [];
-    warnings = [];
     constructor(config) {
         this.config = config;
     }
     validate() {
-        this.errors = [];
-        this.warnings = [];
-        // First check if config has areas field
-        if (!this.config.areas) {
-            this.addError(null, null, 'Missing required "areas" field');
-            return {
-                valid: false,
-                errors: this.errors,
-                warnings: this.warnings
-            };
+        const errors = [];
+        const warnings = [];
+        // Check that we have at least one section
+        if (!this.config.areas && !this.config.files) {
+            errors.push({
+                severity: 'error',
+                area: null,
+                field: null,
+                message: 'Configuration must contain at least one of: "areas" or "files"',
+                fix: 'Add either "files:" or "areas:" section to your configuration'
+            });
+            return { valid: false, errors, warnings };
         }
-        this.validateSchema();
-        this.validatePatterns();
-        this.validateLogic();
+        // Validate areas section if present
+        if (this.config.areas) {
+            for (const [areaName, areaConfig] of Object.entries(this.config.areas)) {
+                // Check for reserved name
+                if (areaName === 'files') {
+                    errors.push({
+                        severity: 'error',
+                        area: areaName,
+                        field: null,
+                        message: 'Area name "files" is reserved. Please use a different name.',
+                        fix: 'Rename this area to something like "file_processor" or "file_checks"'
+                    });
+                }
+                // Check for spaces in area names
+                if (areaName.includes(' ')) {
+                    errors.push({
+                        severity: 'error',
+                        area: areaName,
+                        field: null,
+                        message: `Area name "${areaName}" cannot contain spaces`,
+                        fix: `Use underscores or hyphens instead, e.g., "${areaName.replace(/ /g, '_')}"`
+                    });
+                }
+                // Validate area config
+                const areaValidation = this.validateAreaConfig(areaName, areaConfig);
+                errors.push(...areaValidation.errors);
+                warnings.push(...areaValidation.warnings);
+            }
+        }
+        // Validate files section if present
+        if (this.config.files) {
+            const filesValidation = this.validateAreaConfig('files', this.config.files);
+            errors.push(...filesValidation.errors);
+            warnings.push(...filesValidation.warnings);
+        }
         return {
-            valid: this.errors.length === 0,
-            errors: this.errors,
-            warnings: this.warnings
+            valid: errors.length === 0,
+            errors,
+            warnings
         };
     }
-    validateSchema() {
-        if (!this.config.areas) {
-            this.addError(null, 'areas', 'Missing required "areas" field');
-            return;
+    validateAreaConfig(name, config) {
+        const errors = [];
+        const warnings = [];
+        // Validate include patterns
+        if (!config.include || !Array.isArray(config.include) || config.include.length === 0) {
+            errors.push({
+                severity: 'error',
+                area: name,
+                field: 'include',
+                message: `${name}: "include" must be a non-empty array of patterns`,
+                fix: `${name}:\n  include:\n    - "src/**"`
+            });
         }
-        if (typeof this.config.areas !== 'object') {
-            this.addError(null, 'areas', '"areas" must be an object');
-            return;
-        }
-        if (Object.keys(this.config.areas).length === 0) {
-            this.addError(null, 'areas', 'At least one area must be defined');
-            return;
-        }
-        for (const [areaName, areaConfig] of Object.entries(this.config.areas)) {
-            this.validateArea(areaName, areaConfig);
-        }
-    }
-    validateArea(name, config) {
-        // Check for spaces in area name
-        if (/\s/.test(name)) {
-            this.addError(name, null, 'Area names cannot contain spaces', 'Use hyphens or underscores: "backend-api" or "backend_api"');
-        }
-        // Required: include
-        if (!config.include) {
-            this.addError(name, 'include', 'Missing required "include" field');
-            return;
-        }
-        if (!Array.isArray(config.include)) {
-            this.addError(name, 'include', '"include" must be an array of strings');
-            return;
-        }
-        if (config.include.length === 0) {
-            this.addError(name, 'include', 'At least one include pattern is required', 'Add a pattern like "src/**" to define what files belong to this area');
-        }
-        // Optional: exclude
-        if (config.exclude !== undefined) {
-            if (!Array.isArray(config.exclude)) {
-                this.addError(name, 'exclude', '"exclude" must be an array of strings');
+        // Validate patterns
+        if (config.include) {
+            for (const pattern of config.include) {
+                if (typeof pattern !== 'string' || pattern.trim().length === 0) {
+                    errors.push({
+                        severity: 'error',
+                        area: name,
+                        field: 'include',
+                        message: `${name}: Invalid pattern: ${pattern}`,
+                        fix: 'All patterns must be non-empty strings'
+                    });
+                }
+                else {
+                    // Validate pattern content
+                    // Check for absolute paths
+                    if (pattern.startsWith('/')) {
+                        warnings.push({
+                            severity: 'warning',
+                            area: name,
+                            message: `Pattern "${pattern}" is an absolute path`,
+                            recommendation: 'Use relative paths like "src/**" instead'
+                        });
+                    }
+                    // Check for backslashes
+                    if (pattern.includes('\\')) {
+                        warnings.push({
+                            severity: 'warning',
+                            area: name,
+                            message: `Pattern "${pattern}" contains backslashes`,
+                            recommendation: 'Use forward slashes for cross-platform compatibility'
+                        });
+                    }
+                    // Check for overly broad patterns
+                    if (pattern === '**' || pattern === '*') {
+                        warnings.push({
+                            severity: 'warning',
+                            area: name,
+                            message: `Pattern "${pattern}" matches all files`,
+                            recommendation: 'Consider being more specific to improve performance'
+                        });
+                    }
+                }
             }
+        }
+        // Validate exclude if present
+        if (config.exclude && !Array.isArray(config.exclude)) {
+            errors.push({
+                severity: 'error',
+                area: name,
+                field: 'exclude',
+                message: `${name}: "exclude" must be an array of patterns`
+            });
         }
         // Optional: required_extensions
         if (config.required_extensions !== undefined) {
             if (!Array.isArray(config.required_extensions)) {
-                this.addError(name, 'required_extensions', '"required_extensions" must be an array of strings');
+                errors.push({
+                    severity: 'error',
+                    area: name,
+                    field: 'required_extensions',
+                    message: '"required_extensions" must be an array of strings'
+                });
             }
             else {
                 for (const ext of config.required_extensions) {
                     if (!ext.startsWith('.')) {
-                        this.addWarning(name, `Extension "${ext}" should start with a dot (e.g., ".ts")`, 'Use ".ts" instead of "ts"');
+                        warnings.push({
+                            severity: 'warning',
+                            area: name,
+                            message: `Extension "${ext}" should start with a dot (e.g., ".ts")`,
+                            recommendation: 'Use ".ts" instead of "ts"'
+                        });
                     }
                 }
             }
@@ -34637,10 +34730,20 @@ class ConfigValidator {
         // Optional: min_changed_files
         if (config.min_changed_files !== undefined) {
             if (typeof config.min_changed_files !== 'number') {
-                this.addError(name, 'min_changed_files', '"min_changed_files" must be a number');
+                errors.push({
+                    severity: 'error',
+                    area: name,
+                    field: 'min_changed_files',
+                    message: '"min_changed_files" must be a number'
+                });
             }
             else if (config.min_changed_files < 1) {
-                this.addError(name, 'min_changed_files', '"min_changed_files" must be >= 1');
+                errors.push({
+                    severity: 'error',
+                    area: name,
+                    field: 'min_changed_files',
+                    message: '"min_changed_files" must be >= 1'
+                });
             }
         }
         // Optional: boolean flags
@@ -34652,73 +34755,19 @@ class ConfigValidator {
         for (const flag of booleanFlags) {
             const value = config[flag];
             if (value !== undefined && typeof value !== 'boolean') {
-                this.addError(name, flag, `"${flag}" must be true or false`);
+                errors.push({
+                    severity: 'error',
+                    area: name,
+                    field: flag,
+                    message: `"${flag}" must be true or false`
+                });
             }
         }
-    }
-    // ... rest of the file remains the same
-    validateLogic() {
-        for (const [name, config] of Object.entries(this.config.areas)) {
-            // Check: only excludes without includes
-            if ((config.exclude?.length ?? 0) > 0 && (config.include?.length ?? 0) === 0) {
-                this.addError(name, null, 'Area has exclude patterns but no include patterns', 'Add at least one include pattern to define what this area matches');
-            }
-            // Check: include and exclude contain same pattern
-            if (config.include && config.exclude) {
-                const duplicates = config.include.filter(p => config.exclude.includes(p));
-                if (duplicates.length > 0) {
-                    this.addWarning(name, `Pattern "${duplicates[0]}" appears in both include and exclude`, 'This pattern will never match. Remove it from one of the lists.');
-                }
-            }
-        }
-    }
-    validatePatterns() {
-        for (const [name, config] of Object.entries(this.config.areas)) {
-            // Validate include patterns
-            if (config.include) {
-                for (const pattern of config.include) {
-                    this.validatePattern(name, 'include', pattern);
-                }
-            }
-            // Validate exclude patterns
-            if (config.exclude) {
-                for (const pattern of config.exclude) {
-                    this.validatePattern(name, 'exclude', pattern);
-                }
-            }
-        }
-    }
-    validatePattern(area, field, pattern) {
-        // Check for absolute paths
-        if (pattern.startsWith('/')) {
-            this.addWarning(area, `Pattern "${pattern}" is an absolute path`, 'Use relative paths like "src/**" instead');
-        }
-        // Check for backslashes
-        if (pattern.includes('\\')) {
-            this.addWarning(area, `Pattern "${pattern}" contains backslashes`, 'Use forward slashes for cross-platform compatibility');
-        }
-        // Validate glob syntax
-        try {
-            new minimatch_1.Minimatch(pattern);
-        }
-        catch (error) {
-            const err = error;
-            this.addError(area, field, `Invalid glob pattern "${pattern}": ${err.message}`);
-        }
-        // Check for multiple consecutive slashes
-        if (pattern.includes('//')) {
-            this.addError(area, field, `Pattern "${pattern}" contains multiple consecutive slashes`);
-        }
-        // Check for overly broad patterns
-        if (pattern === '**' || pattern === '*') {
-            this.addWarning(area, `Pattern "${pattern}" matches all files`, 'Consider being more specific to improve performance');
-        }
-    }
-    addError(area, field, message, fix) {
-        this.errors.push({ severity: 'error', area, field, message, fix });
-    }
-    addWarning(area, message, recommendation) {
-        this.warnings.push({ severity: 'warning', area, message, recommendation });
+        return {
+            valid: errors.length === 0,
+            errors,
+            warnings
+        };
     }
 }
 exports.ConfigValidator = ConfigValidator;
@@ -35080,7 +35129,7 @@ const logger_1 = __nccwpck_require__(7893);
 const edge_cases_1 = __nccwpck_require__(7774);
 async function run() {
     try {
-        logger_1.Logger.info('🚀 Changed Areas Action starting...');
+        logger_1.Logger.info('Changed Files Action starting...');
         // 1. Load inputs
         const inputs = (0, loader_1.getActionInputs)();
         // 2. Load configuration
@@ -35111,63 +35160,53 @@ async function run() {
         }
         logger_1.Logger.info('✅ Configuration valid');
         logger_1.Logger.endGroup();
-        // 4. Discover changed files
+        // 4. Merge areas and files sections
+        const allAreas = (0, loader_1.mergeConfigSections)(config);
+        logger_1.Logger.info(`Processing ${Object.keys(allAreas).length} section(s):`);
+        for (const name of Object.keys(allAreas)) {
+            logger_1.Logger.info(`  - ${name}`);
+        }
+        // 5. Discover changed files
         logger_1.Logger.startGroup('Discovering changed files');
         const changedFiles = await (0, discovery_1.discoverChangedFiles)(github_1.context, inputs.github_token, inputs.edge_cases);
         logger_1.Logger.endGroup();
-        // 5. Handle empty commits
+        // 6. Handle empty commits
         if ((0, edge_cases_1.isEmptyCommit)(changedFiles)) {
             const { triggerAll } = (0, edge_cases_1.handleEmptyCommit)(inputs.edge_cases);
-            if (!triggerAll) {
-                // Set all areas to unchanged
-                const emptyResults = {};
-                for (const areaName of Object.keys(config.areas)) {
-                    emptyResults[areaName] = {
-                        changed: false,
-                        files: [],
-                        count: 0
-                    };
-                }
-                (0, generator_1.generateOutputs)(emptyResults);
-                await (0, summary_1.createSummary)(emptyResults);
-                logger_1.Logger.info('✅ Empty commit - no areas triggered');
-                return;
-            }
-            // Trigger all areas
-            const allResults = {};
-            for (const areaName of Object.keys(config.areas)) {
-                allResults[areaName] = {
-                    changed: true,
+            const emptyResults = {};
+            for (const areaName of Object.keys(allAreas)) {
+                emptyResults[areaName] = {
+                    changed: triggerAll,
                     files: [],
                     count: 0,
-                    reason: 'Empty commit configured to trigger all areas'
+                    reason: triggerAll ? 'Empty commit configured to trigger all' : 'Empty commit'
                 };
             }
-            (0, generator_1.generateOutputs)(allResults);
-            await (0, summary_1.createSummary)(allResults);
-            logger_1.Logger.info('✅ Empty commit - all areas triggered');
+            (0, generator_1.generateOutputs)(emptyResults);
+            await (0, summary_1.createSummary)(emptyResults);
+            logger_1.Logger.info(`✅ Empty commit - ${triggerAll ? 'all triggered' : 'none triggered'}`);
             return;
         }
-        // 6. Classify files into areas
-        logger_1.Logger.startGroup('Classifying files into areas');
-        const classified = (0, matcher_1.classifyFiles)(changedFiles, config.areas);
-        for (const [areaName, files] of Object.entries(classified)) {
+        // 7. Classify files (works for both areas and files section)
+        logger_1.Logger.startGroup('Classifying files');
+        const classified = (0, matcher_1.classifyFiles)(changedFiles, allAreas);
+        for (const [name, files] of Object.entries(classified)) {
             if (files.length > 0) {
-                logger_1.Logger.info(`[${areaName}] Matched ${files.length} file(s)`);
+                logger_1.Logger.info(`[${name}] Matched ${files.length} file(s)`);
             }
         }
         logger_1.Logger.endGroup();
-        // 7. Apply constraints
-        const results = (0, constraints_1.applyConstraintsToAll)(classified, config.areas);
+        // 8. Apply constraints
+        const results = (0, constraints_1.applyConstraintsToAll)(classified, allAreas);
         // Log any constraint rejections
-        for (const [areaName, result] of Object.entries(results)) {
+        for (const [name, result] of Object.entries(results)) {
             if (result.reason) {
-                logger_1.Logger.info(`[${areaName}] ${result.reason}`);
+                logger_1.Logger.info(`[${name}] ${result.reason}`);
             }
         }
-        // 8. Generate outputs
+        // 9. Generate outputs (same for all sections)
         (0, generator_1.generateOutputs)(results);
-        // 9. Create summary
+        // 10. Create summary
         await (0, summary_1.createSummary)(results);
         logger_1.Logger.info(`✅ Successfully analyzed ${changedFiles.length} changed file(s)`);
     }
@@ -35309,20 +35348,20 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.createSummary = createSummary;
 const core = __importStar(__nccwpck_require__(7484));
 async function createSummary(results) {
-    const changedAreas = Object.entries(results).filter(([_, result]) => result.changed);
-    const unchangedAreas = Object.entries(results).filter(([_, result]) => !result.changed);
+    const changedSections = Object.entries(results).filter(([_, result]) => result.changed);
+    const unchangedSections = Object.entries(results).filter(([_, result]) => !result.changed);
     const summary = core.summary
-        .addHeading('📊 Changed Areas Analysis', 2)
+        .addHeading('Changed Files Analysis', 2)
         .addRaw('\n');
-    if (changedAreas.length > 0) {
-        summary.addHeading('✅ Changed Areas', 3);
+    if (changedSections.length > 0) {
+        summary.addHeading('Changed', 3);
         const changedTable = [
             [
-                { data: 'Area', header: true },
+                { data: 'Section', header: true },
                 { data: 'Files Changed', header: true },
                 { data: 'Status', header: true }
             ],
-            ...changedAreas.map(([name, result]) => [
+            ...changedSections.map(([name, result]) => [
                 name,
                 result.count.toString(),
                 '✅ Changed'
@@ -35330,14 +35369,14 @@ async function createSummary(results) {
         ];
         summary.addTable(changedTable).addRaw('\n');
     }
-    if (unchangedAreas.length > 0) {
-        summary.addHeading('⚪ Unchanged Areas', 3);
+    if (unchangedSections.length > 0) {
+        summary.addHeading('Unchanged', 3);
         const unchangedTable = [
             [
-                { data: 'Area', header: true },
+                { data: 'Section', header: true },
                 { data: 'Status', header: true }
             ],
-            ...unchangedAreas.map(([name, _]) => [name, '⚪ No changes'])
+            ...unchangedSections.map(([name, _]) => [name, '⚪ No changes'])
         ];
         summary.addTable(unchangedTable).addRaw('\n');
     }

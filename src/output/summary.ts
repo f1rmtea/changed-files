@@ -2,23 +2,23 @@ import * as core from '@actions/core';
 import { AreaResult } from '../types';
 
 export async function createSummary(results: Record<string, AreaResult>): Promise<void> {
-  const changedAreas = Object.entries(results).filter(([_, result]) => result.changed);
-  const unchangedAreas = Object.entries(results).filter(([_, result]) => !result.changed);
+  const changedSections = Object.entries(results).filter(([_, result]) => result.changed);
+  const unchangedSections = Object.entries(results).filter(([_, result]) => !result.changed);
 
   const summary = core.summary
-    .addHeading('📊 Changed Areas Analysis', 2)
+    .addHeading('Changed Files Analysis', 2)
     .addRaw('\n');
 
-  if (changedAreas.length > 0) {
-    summary.addHeading('✅ Changed Areas', 3);
+  if (changedSections.length > 0) {
+    summary.addHeading('Changed', 3);
     
     const changedTable = [
       [
-        { data: 'Area', header: true },
+        { data: 'Section', header: true },
         { data: 'Files Changed', header: true },
         { data: 'Status', header: true }
       ],
-      ...changedAreas.map(([name, result]) => [
+      ...changedSections.map(([name, result]) => [
         name,
         result.count.toString(),
         '✅ Changed'
@@ -28,15 +28,15 @@ export async function createSummary(results: Record<string, AreaResult>): Promis
     summary.addTable(changedTable).addRaw('\n');
   }
 
-  if (unchangedAreas.length > 0) {
-    summary.addHeading('⚪ Unchanged Areas', 3);
+  if (unchangedSections.length > 0) {
+    summary.addHeading('Unchanged', 3);
     
     const unchangedTable = [
       [
-        { data: 'Area', header: true },
+        { data: 'Section', header: true },
         { data: 'Status', header: true }
       ],
-      ...unchangedAreas.map(([name, _]) => [name, '⚪ No changes'])
+      ...unchangedSections.map(([name, _]) => [name, '⚪ No changes'])
     ];
 
     summary.addTable(unchangedTable).addRaw('\n');

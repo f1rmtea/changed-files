@@ -1,6 +1,6 @@
 import * as core from '@actions/core';
 import { context } from '@actions/github';
-import { getActionInputs, loadConfig } from './config/loader';
+import { getActionInputs, loadConfig, mergeConfigSections } from './config/loader';
 import { ConfigValidator } from './config/validator';
 import { discoverChangedFiles } from './diff/discovery';
 import { classifyFiles } from './classify/matcher';
@@ -14,7 +14,7 @@ import { AreaResult } from './types';
 
 async function run(): Promise<void> {
   try {
-    Logger.info('🚀 Changed Areas Action starting...');
+    Logger.info('Changed Files Action starting...');
 
     // 1. Load inputs
     const inputs = getActionInputs();
@@ -55,74 +55,64 @@ async function run(): Promise<void> {
     Logger.info('✅ Configuration valid');
     Logger.endGroup();
 
-    // 4. Discover changed files
+    // 4. Merge areas and files sections
+    const allAreas = mergeConfigSections(config);
+    
+    Logger.info(`Processing ${Object.keys(allAreas).length} section(s):`);
+    for (const name of Object.keys(allAreas)) {
+      Logger.info(`  - ${name}`);
+    }
+
+    // 5. Discover changed files
     Logger.startGroup('Discovering changed files');
     const changedFiles = await discoverChangedFiles(context, inputs.github_token, inputs.edge_cases);
     Logger.endGroup();
 
-    // 5. Handle empty commits
+    // 6. Handle empty commits
     if (isEmptyCommit(changedFiles)) {
       const { triggerAll } = handleEmptyCommit(inputs.edge_cases);
 
-      if (!triggerAll) {
-        // Set all areas to unchanged
-        const emptyResults: Record<string, AreaResult> = {};
-        for (const areaName of Object.keys(config.areas)) {
-          emptyResults[areaName] = {
-            changed: false,
-            files: [],
-            count: 0
-          };
-        }
-
-        generateOutputs(emptyResults);
-        await createSummary(emptyResults);
-        Logger.info('✅ Empty commit - no areas triggered');
-        return;
-      }
-
-      // Trigger all areas
-      const allResults: Record<string, AreaResult> = {};
-      for (const areaName of Object.keys(config.areas)) {
-        allResults[areaName] = {
-          changed: true,
+      const emptyResults: Record<string, AreaResult> = {};
+      for (const areaName of Object.keys(allAreas)) {
+        emptyResults[areaName] = {
+          changed: triggerAll,
           files: [],
           count: 0,
-          reason: 'Empty commit configured to trigger all areas'
+          reason: triggerAll ? 'Empty commit configured to trigger all' : 'Empty commit'
         };
       }
 
-      generateOutputs(allResults);
-      await createSummary(allResults);
-      Logger.info('✅ Empty commit - all areas triggered');
+      generateOutputs(emptyResults);
+      await createSummary(emptyResults);
+      Logger.info(`✅ Empty commit - ${triggerAll ? 'all triggered' : 'none triggered'}`);
       return;
     }
 
-    // 6. Classify files into areas
-    Logger.startGroup('Classifying files into areas');
-    const classified = classifyFiles(changedFiles, config.areas);
+    // 7. Classify files (works for both areas and files section)
+    Logger.startGroup('Classifying files');
+    const classified = classifyFiles(changedFiles, allAreas);
 
-    for (const [areaName, files] of Object.entries(classified)) {
+    for (const [name, files] of Object.entries(classified)) {
       if (files.length > 0) {
-        Logger.info(`[${areaName}] Matched ${files.length} file(s)`);
+        Logger.info(`[${name}] Matched ${files.length} file(s)`);
       }
     }
     Logger.endGroup();
 
-    // 7. Apply constraints
-    const results = applyConstraintsToAll(classified, config.areas);
+    // 8. Apply constraints
+    const results = applyConstraintsToAll(classified, allAreas);
 
     // Log any constraint rejections
-    for (const [areaName, result] of Object.entries(results)) {
+    for (const [name, result] of Object.entries(results)) {
       if (result.reason) {
-        Logger.info(`[${areaName}] ${result.reason}`);
+        Logger.info(`[${name}] ${result.reason}`);
       }
     }
 
-    // 8. Generate outputs
+    // 9. Generate outputs (same for all sections)
     generateOutputs(results);
 
-    // 9. Create summary
+    // 10. Create summary
     await createSummary(results);
 
     Logger.info(`✅ Successfully analyzed ${changedFiles.length} changed file(s)`);

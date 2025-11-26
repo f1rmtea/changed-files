@@ -1,115 +1,163 @@
-import { Minimatch } from 'minimatch';
-import { ChangedAreasConfig, AreaConfig, ValidationResult, ValidationError, ValidationWarning } from '../types';
+import { UnifiedConfig, AreaConfig, ValidationResult, ValidationError, ValidationWarning } from '../types';
 
 export class ConfigValidator {
-  private config: ChangedAreasConfig;
-  private errors: ValidationError[] = [];
-  private warnings: ValidationWarning[] = [];
+  private config: UnifiedConfig;
 
-  constructor(config: ChangedAreasConfig) {
+  constructor(config: UnifiedConfig) {
     this.config = config;
   }
 
   validate(): ValidationResult {
-    this.errors = [];
-    this.warnings = [];
+    const errors: ValidationError[] = [];
+    const warnings: ValidationWarning[] = [];
 
-    // First check if config has areas field
-    if (!this.config.areas) {
-      this.addError(null, null, 'Missing required "areas" field');
-      return {
-        valid: false,
-        errors: this.errors,
-        warnings: this.warnings
-      };
+    // Check that we have at least one section
+    if (!this.config.areas && !this.config.files) {
+      errors.push({
+        severity: 'error',
+        area: null,
+        field: null,
+        message: 'Configuration must contain at least one of: "areas" or "files"',
+        fix: 'Add either "files:" or "areas:" section to your configuration'
+      });
+      return { valid: false, errors, warnings };
     }
 
-    this.validateSchema();
-    this.validatePatterns();
-    this.validateLogic();
+    // Validate areas section if present
+    if (this.config.areas) {
+      for (const [areaName, areaConfig] of Object.entries(this.config.areas)) {
+        // Check for reserved name
+        if (areaName === 'files') {
+          errors.push({
+            severity: 'error',
+            area: areaName,
+            field: null,
+            message: 'Area name "files" is reserved. Please use a different name.',
+            fix: 'Rename this area to something like "file_processor" or "file_checks"'
+          });
+        }
+
+        // Check for spaces in area names
+        if (areaName.includes(' ')) {
+          errors.push({
+            severity: 'error',
+            area: areaName,
+            field: null,
+            message: `Area name "${areaName}" cannot contain spaces`,
+            fix: `Use underscores or hyphens instead, e.g., "${areaName.replace(/ /g, '_')}"`
+          });
+        }
+
+        // Validate area config
+        const areaValidation = this.validateAreaConfig(areaName, areaConfig);
+        errors.push(...areaValidation.errors);
+        warnings.push(...areaValidation.warnings);
+      }
+    }
+
+    // Validate files section if present
+    if (this.config.files) {
+      const filesValidation = this.validateAreaConfig('files', this.config.files);
+      errors.push(...filesValidation.errors);
+      warnings.push(...filesValidation.warnings);
+    }
 
     return {
-      valid: this.errors.length === 0,
-      errors: this.errors,
-      warnings: this.warnings
+      valid: errors.length === 0,
+      errors,
+      warnings
     };
   }
 
-  private validateSchema(): void {
-    if (!this.config.areas) {
-      this.addError(null, 'areas', 'Missing required "areas" field');
-      return;
+  private validateAreaConfig(name: string, config: AreaConfig): ValidationResult {
+    const errors: ValidationError[] = [];
+    const warnings: ValidationWarning[] = [];
+
+    // Validate include patterns
+    if (!config.include || !Array.isArray(config.include) || config.include.length === 0) {
+      errors.push({
+        severity: 'error',
+        area: name,
+        field: 'include',
+        message: `${name}: "include" must be a non-empty array of patterns`,
+        fix: `${name}:\n  include:\n    - "src/**"`
+      });
     }
 
-    if (typeof this.config.areas !== 'object') {
-      this.addError(null, 'areas', '"areas" must be an object');
-      return;
-    }
+    // Validate patterns
+    if (config.include) {
+      for (const pattern of config.include) {
+        if (typeof pattern !== 'string' || pattern.trim().length === 0) {
+          errors.push({
+            severity: 'error',
+            area: name,
+            field: 'include',
+            message: `${name}: Invalid pattern: ${pattern}`,
+            fix: 'All patterns must be non-empty strings'
+          });
+        } else {
+          // Validate pattern content
+          // Check for absolute paths
+          if (pattern.startsWith('/')) {
+            warnings.push({
+              severity: 'warning',
+              area: name,
+              message: `Pattern "${pattern}" is an absolute path`,
+              recommendation: 'Use relative paths like "src/**" instead'
+            });
+          }
 
-    if (Object.keys(this.config.areas).length === 0) {
-      this.addError(null, 'areas', 'At least one area must be defined');
-      return;
-    }
+          // Check for backslashes
+          if (pattern.includes('\\')) {
+            warnings.push({
+              severity: 'warning',
+              area: name,
+              message: `Pattern "${pattern}" contains backslashes`,
+              recommendation: 'Use forward slashes for cross-platform compatibility'
+            });
+          }
 
-    for (const [areaName, areaConfig] of Object.entries(this.config.areas)) {
-      this.validateArea(areaName, areaConfig);
-    }
-  }
-
-  private validateArea(name: string, config: AreaConfig): void {
-    // Check for spaces in area name
-    if (/\s/.test(name)) {
-      this.addError(
-        name,
-        null,
-        'Area names cannot contain spaces',
-        'Use hyphens or underscores: "backend-api" or "backend_api"'
-      );
-    }
-
-    // Required: include
-    if (!config.include) {
-      this.addError(name, 'include', 'Missing required "include" field');
-      return;
-    }
-
-    if (!Array.isArray(config.include)) {
-      this.addError(name, 'include', '"include" must be an array of strings');
-      return;
-    }
-
-    if (config.include.length === 0) {
-      this.addError(
-        name,
-        'include',
-        'At least one include pattern is required',
-        'Add a pattern like "src/**" to define what files belong to this area'
-      );
-    }
-
-    // Optional: exclude
-    if (config.exclude !== undefined) {
-      if (!Array.isArray(config.exclude)) {
-        this.addError(name, 'exclude', '"exclude" must be an array of strings');
+          // Check for overly broad patterns
+          if (pattern === '**' || pattern === '*') {
+            warnings.push({
+              severity: 'warning',
+              area: name,
+              message: `Pattern "${pattern}" matches all files`,
+              recommendation: 'Consider being more specific to improve performance'
+            });
+          }
+        }
       }
+    }
+
+    // Validate exclude if present
+    if (config.exclude && !Array.isArray(config.exclude)) {
+      errors.push({
+        severity: 'error',
+        area: name,
+        field: 'exclude',
+        message: `${name}: "exclude" must be an array of patterns`
+      });
     }
 
     // Optional: required_extensions
     if (config.required_extensions !== undefined) {
       if (!Array.isArray(config.required_extensions)) {
-        this.addError(
-          name,
-          'required_extensions',
-          '"required_extensions" must be an array of strings'
-        );
+        errors.push({
+          severity: 'error',
+          area: name,
+          field: 'required_extensions',
+          message: '"required_extensions" must be an array of strings'
+        });
       } else {
         for (const ext of config.required_extensions) {
           if (!ext.startsWith('.')) {
-            this.addWarning(
-              name,
-              `Extension "${ext}" should start with a dot (e.g., ".ts")`,
-              'Use ".ts" instead of "ts"'
-            );
+            warnings.push({
+              severity: 'warning',
+              area: name,
+              message: `Extension "${ext}" should start with a dot (e.g., ".ts")`,
+              recommendation: 'Use ".ts" instead of "ts"'
+            });
           }
         }
       }
@@ -118,9 +166,19 @@ export class ConfigValidator {
     // Optional: min_changed_files
     if (config.min_changed_files !== undefined) {
       if (typeof config.min_changed_files !== 'number') {
-        this.addError(name, 'min_changed_files', '"min_changed_files" must be a number');
+        errors.push({
+          severity: 'error',
+          area: name,
+          field: 'min_changed_files',
+          message: '"min_changed_files" must be a number'
+        });
       } else if (config.min_changed_files < 1) {
-        this.addError(name, 'min_changed_files', '"min_changed_files" must be >= 1');
+        errors.push({
+          severity: 'error',
+          area: name,
+          field: 'min_changed_files',
+          message: '"min_changed_files" must be >= 1'
+        });
       }
     }
 
@@ -134,109 +192,19 @@ export class ConfigValidator {
     for (const flag of booleanFlags) {
       const value = config[flag];
       if (value !== undefined && typeof value !== 'boolean') {
-        this.addError(name, flag, `"${flag}" must be true or false`);
+        errors.push({
+          severity: 'error',
+          area: name,
+          field: flag,
+          message: `"${flag}" must be true or false`
+        });
       }
     }
-  }
 
-  // ... rest of the file remains the same
-  private validateLogic(): void {
-    for (const [name, config] of Object.entries(this.config.areas)) {
-      // Check: only excludes without includes
-      if ((config.exclude?.length ?? 0) > 0 && (config.include?.length ?? 0) === 0) {
-        this.addError(
-          name,
-          null,
-          'Area has exclude patterns but no include patterns',
-          'Add at least one include pattern to define what this area matches'
-        );
-      }
-
-      // Check: include and exclude contain same pattern
-      if (config.include && config.exclude) {
-        const duplicates = config.include.filter(p => config.exclude!.includes(p));
-
-        if (duplicates.length > 0) {
-          this.addWarning(
-            name,
-            `Pattern "${duplicates[0]}" appears in both include and exclude`,
-            'This pattern will never match. Remove it from one of the lists.'
-          );
-        }
-      }
-    }
-  }
-
-  private validatePatterns(): void {
-    for (const [name, config] of Object.entries(this.config.areas)) {
-      // Validate include patterns
-      if (config.include) {
-        for (const pattern of config.include) {
-          this.validatePattern(name, 'include', pattern);
-        }
-      }
-
-      // Validate exclude patterns
-      if (config.exclude) {
-        for (const pattern of config.exclude) {
-          this.validatePattern(name, 'exclude', pattern);
-        }
-      }
-    }
-  }
-
-  private validatePattern(area: string, field: string, pattern: string): void {
-    // Check for absolute paths
-    if (pattern.startsWith('/')) {
-      this.addWarning(
-        area,
-        `Pattern "${pattern}" is an absolute path`,
-        'Use relative paths like "src/**" instead'
-      );
-    }
-
-    // Check for backslashes
-    if (pattern.includes('\\')) {
-      this.addWarning(
-        area,
-        `Pattern "${pattern}" contains backslashes`,
-        'Use forward slashes for cross-platform compatibility'
-      );
-    }
-
-    // Validate glob syntax
-    try {
-      new Minimatch(pattern);
-    } catch (error) {
-      const err = error as Error;
-      this.addError(area, field, `Invalid glob pattern "${pattern}": ${err.message}`);
-    }
-
-    // Check for multiple consecutive slashes
-    if (pattern.includes('//')) {
-      this.addError(area, field, `Pattern "${pattern}" contains multiple consecutive slashes`);
-    }
-
-    // Check for overly broad patterns
-    if (pattern === '**' || pattern === '*') {
-      this.addWarning(
-        area,
-        `Pattern "${pattern}" matches all files`,
-        'Consider being more specific to improve performance'
-      );
-    }
-  }
-
-  private addError(
-    area: string | null,
-    field: string | null,
-    message: string,
-    fix?: string
-  ): void {
-    this.errors.push({ severity: 'error', area, field, message, fix });
-  }
-
-  private addWarning(area: string | null, message: string, recommendation: string): void {
-    this.warnings.push({ severity: 'warning', area, message, recommendation });
+    return {
+      valid: errors.length === 0,
+      errors,
+      warnings
+    };
   }
 }

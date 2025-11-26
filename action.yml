@@ -7,7 +7,27 @@ branding:
 
 inputs:
   config:
-    description: 'Path to config file (default: .github/changed-areas.yml)'
+    description: |
+      Path to config file (default: .github/changed-areas.yml)
+      
+      Use 'files' for simple file matching:
+        files:
+          include: ["src/**/*.ts"]
+          exclude: ["**/*.test.ts"]
+      
+      Use 'areas' for multiple classifications:
+        areas:
+          backend:
+            include: ["src/backend/**"]
+          frontend:
+            include: ["src/frontend/**"]
+      
+      Or use both together:
+        areas:
+          backend:
+            include: ["src/backend/**"]
+        files:
+          include: ["Dockerfile"]
     required: false
     default: '.github/changed-areas.yml'
   config_inline:

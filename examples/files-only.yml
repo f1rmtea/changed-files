@@ -1,0 +1,36 @@
+name: Check Docker Files
+
+on:
+  pull_request:
+  push:
+    branches: [main, develop]
+
+jobs:
+  check-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Check Docker file changes
+        id: docker
+        uses: f1rmtea/changed-files@main
+        with:
+          config_inline: |
+            files:
+              include:
+                - "Dockerfile"
+                - "docker-compose.yml"
+                - ".dockerignore"
+      
+      - name: Rebuild containers
+        if: steps.docker.outputs.files_changed == 'true'
+        run: docker-compose build
+      
+      - name: Show changed files
+        if: steps.docker.outputs.files_changed == 'true'
+        run: |
+          echo "Changed Docker files:"
+          echo "${{ steps.docker.outputs.files_files }}"
+          echo "Total: ${{ steps.docker.outputs.files_count }} file(s)"

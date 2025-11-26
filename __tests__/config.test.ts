@@ -28,7 +28,7 @@ describe('ConfigValidator', () => {
       expect(result.valid).toBe(false);
       expect(result.errors).toContainEqual(
         expect.objectContaining({
-          message: 'Missing required "areas" field'
+          message: 'Configuration must contain at least one of: "areas" or "files"'
         })
       );
     });
