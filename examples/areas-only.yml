@@ -14,9 +14,7 @@ jobs:
       infrastructure: ${{ steps.changes.outputs.infrastructure_changed }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      
+
       - name: Detect changed areas
         id: changes
         uses: f1rmtea/changed-files@main

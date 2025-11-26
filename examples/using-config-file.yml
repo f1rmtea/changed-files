@@ -14,9 +14,7 @@ jobs:
       docker: ${{ steps.changes.outputs.files_changed }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      
+
       # Uses .github/changed-config.yml by default
       - name: Detect changes
         id: changes
