@@ -135,7 +135,83 @@ describe('File Matcher', () => {
       expect(classifyFile(file, config)).toBe(false);
     });
 
-    it('should ignore renamed files when configured', () => {
+    it('should ignore renamed files without content changes when configured', () => {
+      const file: ChangedFile = {
+        path: 'src/new-api.ts',
+        status: 'renamed',
+        previous_path: 'src/old-api.ts',
+        binary: false,
+        additions: 0,
+        deletions: 0,
+        changes: 0
+      };
+
+      const config: AreaConfig = {
+        include: ['src/**'],
+        ignore_renamed_files: true
+      };
+
+      expect(classifyFile(file, config)).toBe(false);
+    });
+
+    it('should NOT ignore renamed files with content changes when ignore_renamed_files is true', () => {
+      const file: ChangedFile = {
+        path: 'src/new-api.ts',
+        status: 'renamed',
+        previous_path: 'src/old-api.ts',
+        binary: false,
+        additions: 10,
+        deletions: 5,
+        changes: 15
+      };
+
+      const config: AreaConfig = {
+        include: ['src/**'],
+        ignore_renamed_files: true
+      };
+
+      expect(classifyFile(file, config)).toBe(true);
+    });
+
+    it('should handle renamed files with only additions', () => {
+      const file: ChangedFile = {
+        path: 'src/new-api.ts',
+        status: 'renamed',
+        previous_path: 'src/old-api.ts',
+        binary: false,
+        additions: 10,
+        deletions: 0,
+        changes: 10
+      };
+
+      const config: AreaConfig = {
+        include: ['src/**'],
+        ignore_renamed_files: true
+      };
+
+      expect(classifyFile(file, config)).toBe(true);
+    });
+
+    it('should handle renamed files with only deletions', () => {
+      const file: ChangedFile = {
+        path: 'src/new-api.ts',
+        status: 'renamed',
+        previous_path: 'src/old-api.ts',
+        binary: false,
+        additions: 0,
+        deletions: 5,
+        changes: 5
+      };
+
+      const config: AreaConfig = {
+        include: ['src/**'],
+        ignore_renamed_files: true
+      };
+
+      expect(classifyFile(file, config)).toBe(true);
+    });
+
+    it('should handle renamed files without additions/deletions data (treat as pure rename)', () => {
       const file: ChangedFile = {
         path: 'src/new-api.ts',
         status: 'renamed',
@@ -148,6 +224,7 @@ describe('File Matcher', () => {
         ignore_renamed_files: true
       };
 
+      // Without additions/deletions data, we assume it's a pure rename
       expect(classifyFile(file, config)).toBe(false);
     });
   });

@@ -43,8 +43,12 @@ export function classifyFile(file: ChangedFile, areaConfig: AreaConfig): boolean
   }
 
   // Step 6: Check ignore_renamed_files
+  // Only ignore renamed files that have no content changes (pure renames)
   if (areaConfig.ignore_renamed_files && file.status === 'renamed') {
-    return false;
+    const hasContentChanges = (file.additions ?? 0) > 0 || (file.deletions ?? 0) > 0;
+    if (!hasContentChanges) {
+      return false;
+    }
   }
 
   return true;
