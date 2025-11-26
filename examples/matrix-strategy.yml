@@ -12,9 +12,7 @@ jobs:
       matrix: ${{ steps.changes.outputs.areas_json }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      
+
       - name: Detect changes
         id: changes
         uses: f1rmtea/changed-files@main

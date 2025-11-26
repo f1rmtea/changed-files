@@ -10,9 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      
+
       - name: Check Python files
         id: python
         uses: f1rmtea/changed-files@main

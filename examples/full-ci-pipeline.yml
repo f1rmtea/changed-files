@@ -83,9 +83,7 @@ jobs:
       frontend: ${{ steps.changes.outputs.frontend_changed }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      
+
       - id: changes
         uses: f1rmtea/changed-files@main
 
@@ -200,7 +198,7 @@ Both `files` and each area support these options:
 | `min_changed_files` | `number` | No | `1` | Minimum files required to trigger |
 | `exclude_binary_files` | `boolean` | No | `false` | Exclude binary files |
 | `ignore_deleted_files` | `boolean` | No | `false` | Ignore deleted files |
-| `ignore_renamed_files` | `boolean` | No | `false` | Ignore renamed files |
+| `ignore_renamed_files` | `boolean` | No | `false` | Ignore renamed files that have no content changes (pure renames only) |
 
 ## Action Inputs
 
@@ -399,7 +397,7 @@ For both `files` and each area, a file matches if:
 3. AND (if `required_extensions` specified) its extension is in the list
 4. AND (if `exclude_binary_files: true`) it's not a binary file
 5. AND (if `ignore_deleted_files: true`) it's not deleted
-6. AND (if `ignore_renamed_files: true`) it's not renamed
+6. AND (if `ignore_renamed_files: true`) it's not a pure rename (renamed files with content changes are still included)
 
 After matching, the `min_changed_files` threshold is applied.
 
@@ -452,9 +450,7 @@ jobs:
       docker: ${{ steps.changes.outputs.files_changed }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      
+
       - name: Detect all changes
         id: changes
         uses: f1rmtea/changed-files@main
@@ -514,8 +510,7 @@ Ensure the configuration file exists or use inline configuration:
 
 Check that:
 1. Patterns use correct glob syntax
-2. `fetch-depth: 0` is set in checkout step
-3. Patterns match actual file paths in repository
+2. Patterns match actual file paths in repository
 
 Debug by listing all changed files:
 
@@ -582,20 +577,34 @@ Remember:
 
 1. **Start Simple**: Use `files:` for basic checks, add `areas:` as complexity grows
 2. **Combine When Useful**: Use both `files:` and `areas:` in one config to consolidate checks
-3. **Set Fetch Depth**: Always use `fetch-depth: 0` in checkout for accurate diffs
-4. **Keep Patterns Simple**: Use broad include patterns and specific exclude patterns
-5. **Use Config Files**: For complex configurations, use external YAML files
-6. **Test Configuration**: Use `strict_validation: true` during setup to catch issues early
-7. **Document Patterns**: Add comments to configuration files explaining each pattern's purpose
+3. **Keep Patterns Simple**: Use broad include patterns and specific exclude patterns
+4. **Use Config Files**: For complex configurations, use external YAML files
+5. **Test Configuration**: Use `strict_validation: true` during setup to catch issues early
+6. **Document Patterns**: Add comments to configuration files explaining each pattern's purpose
 
 ## Performance Considerations
 
 - Optimized for monorepos with hundreds of files
 - Pattern matching uses efficient glob libraries
-- Git operations delegated to GitHub's API
+- **Uses GitHub's REST API** - no git commands executed locally, works with any `fetch-depth`
 - Single action call can check multiple areas and file patterns
 - Configuration parsed once and reused
 - All matching happens in parallel
+
+### Shallow Clones
+
+This action **does not require** `fetch-depth: 0`. It uses GitHub's API to fetch changed files, not local git commands:
+- Pull requests: Uses `GET /repos/{owner}/{repo}/pulls/{number}/files`
+- Push events: Uses `GET /repos/{owner}/{repo}/compare/{basehead}`
+
+You can safely use shallow clones:
+```yaml
+- uses: actions/checkout@v4
+  with:
+    fetch-depth: 1  # Shallow clone works perfectly fine
+```
+
+Only use `fetch-depth: 0` if other steps in your workflow need full git history.
 
 ## Contributing
 
