@@ -34427,8 +34427,12 @@ function classifyFile(file, areaConfig) {
         return false;
     }
     // Step 6: Check ignore_renamed_files
+    // Only ignore renamed files that have no content changes (pure renames)
     if (areaConfig.ignore_renamed_files && file.status === 'renamed') {
-        return false;
+        const hasContentChanges = (file.additions ?? 0) > 0 || (file.deletions ?? 0) > 0;
+        if (!hasContentChanges) {
+            return false;
+        }
     }
     return true;
 }
@@ -34927,7 +34931,10 @@ async function getChangedFilesFromPR(context, token) {
                     path: file.filename,
                     status: normalizeStatus(file.status),
                     previous_path: file.previous_filename,
-                    binary: (0, binary_files_1.isBinaryFile)(file.filename)
+                    binary: (0, binary_files_1.isBinaryFile)(file.filename),
+                    additions: file.additions,
+                    deletions: file.deletions,
+                    changes: file.changes
                 }));
                 allFiles.push(...files);
                 // Check if there are more pages
@@ -35005,7 +35012,10 @@ async function getChangedFilesFromPush(context, token, baseRef, headRef) {
                 path: file.filename,
                 status: normalizeStatus(file.status),
                 previous_path: file.previous_filename,
-                binary: (0, binary_files_1.isBinaryFile)(file.filename)
+                binary: (0, binary_files_1.isBinaryFile)(file.filename),
+                additions: file.additions,
+                deletions: file.deletions,
+                changes: file.changes
             })) || [];
             logger_1.Logger.info(`Found ${files.length} changed file(s)`);
             return files;

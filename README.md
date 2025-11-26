@@ -200,7 +200,7 @@ Both `files` and each area support these options:
 | `min_changed_files` | `number` | No | `1` | Minimum files required to trigger |
 | `exclude_binary_files` | `boolean` | No | `false` | Exclude binary files |
 | `ignore_deleted_files` | `boolean` | No | `false` | Ignore deleted files |
-| `ignore_renamed_files` | `boolean` | No | `false` | Ignore renamed files |
+| `ignore_renamed_files` | `boolean` | No | `false` | Ignore renamed files that have no content changes (pure renames only) |
 
 ## Action Inputs
 
@@ -399,7 +399,7 @@ For both `files` and each area, a file matches if:
 3. AND (if `required_extensions` specified) its extension is in the list
 4. AND (if `exclude_binary_files: true`) it's not a binary file
 5. AND (if `ignore_deleted_files: true`) it's not deleted
-6. AND (if `ignore_renamed_files: true`) it's not renamed
+6. AND (if `ignore_renamed_files: true`) it's not a pure rename (renamed files with content changes are still included)
 
 After matching, the `min_changed_files` threshold is applied.
 

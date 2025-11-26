@@ -47,7 +47,10 @@ export async function getChangedFilesFromPR(
             path: file.filename,
             status: normalizeStatus(file.status),
             previous_path: file.previous_filename,
-            binary: isBinaryFile(file.filename)
+            binary: isBinaryFile(file.filename),
+            additions: file.additions,
+            deletions: file.deletions,
+            changes: file.changes
             }));
 
             allFiles.push(...files);

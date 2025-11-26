@@ -32,6 +32,9 @@ export interface ChangedFile {
   status: 'added' | 'modified' | 'removed' | 'renamed';
   previous_path?: string;
   binary: boolean;
+  additions?: number;
+  deletions?: number;
+  changes?: number;
 }
 
 export interface AreaResult {
