@@ -3,7 +3,7 @@ import { context } from '@actions/github';
 import { getActionInputs, loadConfig, mergeConfigSections } from './config/loader';
 import { ConfigValidator } from './config/validator';
 import { discoverChangedFiles } from './diff/discovery';
-import { classifyFiles } from './classify/matcher';
+import { classifyFiles, logDebugInfo } from './classify/matcher';
 import { applyConstraintsToAll } from './classify/constraints';
 import { generateOutputs } from './output/generator';
 import { createSummary } from './output/summary';
@@ -90,8 +90,14 @@ async function run(): Promise<void> {
 
     // 7. Classify files (works for both areas and files section)
     Logger.startGroup('Classifying files');
-    const classified = classifyFiles(changedFiles, allAreas, inputs.edge_cases.debug);
+    const { results: classified, debugInfo } = classifyFiles(changedFiles, allAreas, inputs.edge_cases.debug);
 
+    // Show grouped debug info if debug mode is 'true' (inside the group)
+    if (inputs.edge_cases.debug === true) {
+      logDebugInfo(debugInfo);
+    }
+
+    // Show match summaries
     for (const [name, files] of Object.entries(classified)) {
       if (files.length > 0) {
         Logger.info(`[${name}] Matched ${files.length} file(s)`);

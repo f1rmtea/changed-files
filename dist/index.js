@@ -34395,6 +34395,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.classifyFile = classifyFile;
 exports.classifyFiles = classifyFiles;
+exports.logDebugInfo = logDebugInfo;
 const minimatch_1 = __nccwpck_require__(6507);
 const path = __importStar(__nccwpck_require__(6928));
 const logger_1 = __nccwpck_require__(7893);
@@ -34526,11 +34527,12 @@ function classifyFiles(files, areas, debug = false) {
             debugInfoByFile.push(fileDebugInfo);
         }
     }
-    // Output grouped debug info if debug mode is 'true'
-    if (debug === true && debugInfoByFile.length > 0) {
-        logGroupedDebugInfo(debugInfoByFile);
+    return { results, debugInfo: debugInfoByFile };
+}
+function logDebugInfo(debugInfo) {
+    if (debugInfo.length > 0) {
+        logGroupedDebugInfo(debugInfo);
     }
-    return results;
 }
 
 
@@ -35289,7 +35291,12 @@ async function run() {
         }
         // 7. Classify files (works for both areas and files section)
         logger_1.Logger.startGroup('Classifying files');
-        const classified = (0, matcher_1.classifyFiles)(changedFiles, allAreas, inputs.edge_cases.debug);
+        const { results: classified, debugInfo } = (0, matcher_1.classifyFiles)(changedFiles, allAreas, inputs.edge_cases.debug);
+        // Show grouped debug info if debug mode is 'true' (inside the group)
+        if (inputs.edge_cases.debug === true) {
+            (0, matcher_1.logDebugInfo)(debugInfo);
+        }
+        // Show match summaries
         for (const [name, files] of Object.entries(classified)) {
             if (files.length > 0) {
                 logger_1.Logger.info(`[${name}] Matched ${files.length} file(s)`);
