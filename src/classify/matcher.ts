@@ -135,7 +135,7 @@ export function classifyFiles(
   files: ChangedFile[],
   areas: Record<string, AreaConfig>,
   debug: DebugMode = false
-): Record<string, ChangedFile[]> {
+): { results: Record<string, ChangedFile[]>; debugInfo: FileDebugInfo[] } {
   const results: Record<string, ChangedFile[]> = {};
   const debugInfoByFile: FileDebugInfo[] = [];
 
@@ -173,10 +173,11 @@ export function classifyFiles(
     }
   }
 
-  // Output grouped debug info if debug mode is 'true'
-  if (debug === true && debugInfoByFile.length > 0) {
-    logGroupedDebugInfo(debugInfoByFile);
-  }
+  return { results, debugInfo: debugInfoByFile };
+}
 
-  return results;
+export function logDebugInfo(debugInfo: FileDebugInfo[]): void {
+  if (debugInfo.length > 0) {
+    logGroupedDebugInfo(debugInfo);
+  }
 }
