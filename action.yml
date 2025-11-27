@@ -58,7 +58,11 @@ inputs:
     required: false
     default: 'false'
   debug:
-    description: 'Enable debug mode to show detailed matching decisions for each file'
+    description: |
+      Debug mode level:
+      - 'false': No debug output (default)
+      - 'true': Grouped output showing matches and non-matches per file
+      - 'verbose': Detailed per-section logs for every file
     required: false
     default: 'false'
 

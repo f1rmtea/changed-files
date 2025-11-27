@@ -1,14 +1,25 @@
 import { minimatch } from 'minimatch';
 import * as path from 'path';
-import { ChangedFile, AreaConfig } from '../types';
+import { ChangedFile, AreaConfig, DebugMode } from '../types';
 import { Logger } from '../utils/logger';
+
+interface FileMatchResult {
+  areaName: string;
+  matched: boolean;
+  reason: string;
+}
+
+interface FileDebugInfo {
+  filePath: string;
+  matches: FileMatchResult[];
+}
 
 export function classifyFile(
   file: ChangedFile,
   areaConfig: AreaConfig,
   areaName?: string,
-  debug = false
-): boolean {
+  debug: DebugMode = false
+): { matched: boolean; reason: string } {
   // Step 1: Check if matches ANY include pattern
   let matchedIncludePattern: string | null = null;
   const matchesInclude = areaConfig.include.some(pattern => {
@@ -20,13 +31,14 @@ export function classifyFile(
   });
 
   if (!matchesInclude) {
-    if (debug && areaName) {
-      Logger.info(`[${areaName}] ${file.path} did not match any include patterns`);
+    const reason = 'did not match any include patterns';
+    if (debug === 'verbose' && areaName) {
+      Logger.info(`[${areaName}] ${file.path} ${reason}`);
     }
-    return false;
+    return { matched: false, reason };
   }
 
-  if (debug && areaName && matchedIncludePattern) {
+  if (debug === 'verbose' && areaName && matchedIncludePattern) {
     Logger.info(`[${areaName}] ${file.path} matched include "${matchedIncludePattern}"`);
   }
 
@@ -42,14 +54,15 @@ export function classifyFile(
     });
 
     if (matchesExclude) {
-      if (debug && areaName && matchedExcludePattern) {
-        Logger.info(`[${areaName}] ${file.path} excluded by "${matchedExcludePattern}"`);
+      const reason = `excluded by "${matchedExcludePattern}"`;
+      if (debug === 'verbose' && areaName) {
+        Logger.info(`[${areaName}] ${file.path} ${reason}`);
       }
-      return false;
+      return { matched: false, reason };
     }
   }
 
-  if (debug && areaName) {
+  if (debug === 'verbose' && areaName) {
     Logger.info(`[${areaName}] ${file.path} did not match any exclude patterns`);
   }
 
@@ -57,29 +70,30 @@ export function classifyFile(
   if (areaConfig.required_extensions && areaConfig.required_extensions.length > 0) {
     const fileExt = path.extname(file.path);
     if (!areaConfig.required_extensions.includes(fileExt)) {
-      if (debug && areaName) {
-        Logger.info(
-          `[${areaName}] ${file.path} ignored (extension "${fileExt || '(none)'}" not in required_extensions)`
-        );
+      const reason = `extension "${fileExt || '(none)'}" not in required_extensions`;
+      if (debug === 'verbose' && areaName) {
+        Logger.info(`[${areaName}] ${file.path} ignored (${reason})`);
       }
-      return false;
+      return { matched: false, reason };
     }
   }
 
   // Step 4: Check exclude_binary_files
   if (areaConfig.exclude_binary_files && file.binary) {
-    if (debug && areaName) {
+    const reason = 'binary file excluded';
+    if (debug === 'verbose' && areaName) {
       Logger.info(`[${areaName}] ${file.path} ignored (binary file)`);
     }
-    return false;
+    return { matched: false, reason };
   }
 
   // Step 5: Check ignore_deleted_files
   if (areaConfig.ignore_deleted_files && file.status === 'removed') {
-    if (debug && areaName) {
+    const reason = 'deleted file ignored';
+    if (debug === 'verbose' && areaName) {
       Logger.info(`[${areaName}] ${file.path} ignored (deleted file)`);
     }
-    return false;
+    return { matched: false, reason };
   }
 
   // Step 6: Check ignore_renamed_files
@@ -87,22 +101,43 @@ export function classifyFile(
   if (areaConfig.ignore_renamed_files && file.status === 'renamed') {
     const hasContentChanges = (file.additions ?? 0) > 0 || (file.deletions ?? 0) > 0;
     if (!hasContentChanges) {
-      if (debug && areaName) {
+      const reason = 'pure rename, no content changes';
+      if (debug === 'verbose' && areaName) {
         Logger.info(`[${areaName}] ${file.path} ignored (pure rename, no content changes)`);
       }
-      return false;
+      return { matched: false, reason };
     }
   }
 
-  return true;
+  return { matched: true, reason: matchedIncludePattern ? `matched include "${matchedIncludePattern}"` : 'matched' };
+}
+
+function logGroupedDebugInfo(debugInfo: FileDebugInfo[]): void {
+  for (const fileInfo of debugInfo) {
+    const matched = fileInfo.matches.filter(m => m.matched);
+    const notMatched = fileInfo.matches.filter(m => !m.matched);
+
+    Logger.info(`File: ${fileInfo.filePath}`);
+
+    if (matched.length > 0) {
+      const matchedList = matched.map(m => `${m.areaName} (${m.reason})`).join(', ');
+      Logger.info(`  -> Matches: ${matchedList}`);
+    }
+
+    if (notMatched.length > 0) {
+      const notMatchedList = notMatched.map(m => m.areaName).join(', ');
+      Logger.info(`  -> Not matched: ${notMatchedList}`);
+    }
+  }
 }
 
 export function classifyFiles(
   files: ChangedFile[],
   areas: Record<string, AreaConfig>,
-  debug = false
+  debug: DebugMode = false
 ): Record<string, ChangedFile[]> {
   const results: Record<string, ChangedFile[]> = {};
+  const debugInfoByFile: FileDebugInfo[] = [];
 
   // Initialize all areas
   for (const areaName of Object.keys(areas)) {
@@ -111,11 +146,36 @@ export function classifyFiles(
 
   // Classify each file
   for (const file of files) {
+    const fileDebugInfo: FileDebugInfo = {
+      filePath: file.path,
+      matches: []
+    };
+
     for (const [areaName, areaConfig] of Object.entries(areas)) {
-      if (classifyFile(file, areaConfig, areaName, debug)) {
+      const result = classifyFile(file, areaConfig, areaName, debug);
+
+      if (result.matched) {
         results[areaName].push(file);
       }
+
+      // Collect debug info for grouped output
+      if (debug === true) {
+        fileDebugInfo.matches.push({
+          areaName,
+          matched: result.matched,
+          reason: result.reason
+        });
+      }
     }
+
+    if (debug === true) {
+      debugInfoByFile.push(fileDebugInfo);
+    }
+  }
+
+  // Output grouped debug info if debug mode is 'true'
+  if (debug === true && debugInfoByFile.length > 0) {
+    logGroupedDebugInfo(debugInfoByFile);
   }
 
   return results;
