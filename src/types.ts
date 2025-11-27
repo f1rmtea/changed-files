@@ -19,13 +19,15 @@ export interface UnifiedConfig {
   files?: AreaConfig;
 }
 
+export type DebugMode = false | true | 'verbose';
+
 export interface EdgeCaseConfig {
   merge_commit_strategy: 'first-parent' | 'all-parents';
   force_push_strategy: 'compare-default-branch' | 'all-files' | 'fail';
   empty_commit_behavior: 'none' | 'all';
   ignore_binary_files: boolean;
   strict_validation: boolean;
-  debug: boolean;
+  debug: DebugMode;
 }
 
 export interface ChangedFile {

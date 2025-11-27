@@ -212,7 +212,7 @@ Both `files` and each area support these options:
 | `empty_commit_behavior` | No | `none` | `none` or `all` |
 | `ignore_binary_files` | No | `false` | Globally ignore binary files (overrides per-area settings) |
 | `strict_validation` | No | `false` | Treat configuration warnings as errors |
-| `debug` | No | `false` | Enable debug mode to show detailed matching decisions for each file |
+| `debug` | No | `false` | Debug mode level: `false` (no debug), `true` (grouped per-file), or `verbose` (detailed per-section logs) |
 
 ## Action Outputs
 
@@ -497,9 +497,32 @@ jobs:
 
 ## Debug Mode
 
-Enable debug mode to see detailed matching decisions for every file. This feature provides unique visibility into why files matched or didn't match your patterns, making troubleshooting dramatically easier.
+Debug mode helps troubleshoot pattern matching by showing why files matched or didn't match your configuration. The action supports three debug levels to balance verbosity with usefulness.
 
-### Enabling Debug Mode
+### Debug Levels
+
+#### `debug: false` (Default)
+No debug output. Only shows final match summaries.
+
+```yaml
+- uses: f1rmtea/changed-files@main
+  with:
+    debug: false  # or omit this line
+    config_inline: |
+      areas:
+        backend:
+          include:
+            - "src/backend/**"
+```
+
+**Output:**
+```
+[backend] Matched 2 file(s)
+[frontend] Matched 0 file(s)
+```
+
+#### `debug: true` (Grouped)
+Shows matches and non-matches grouped by file. This is the recommended mode for troubleshooting - it's concise but informative.
 
 ```yaml
 - uses: f1rmtea/changed-files@main
@@ -512,43 +535,75 @@ Enable debug mode to see detailed matching decisions for every file. This featur
             - "src/backend/**"
           exclude:
             - "**/*.test.ts"
-          required_extensions: [".ts", ".tsx"]
+        frontend:
+          include:
+            - "src/frontend/**"
         python:
           include:
             - "**/*.py"
 ```
 
-### Example Debug Output
-
-When debug mode is enabled, the action prints detailed information for each file:
-
+**Output:**
 ```
-[backend] src/backend/user.ts matched include "src/backend/**"
-[backend] src/backend/user.ts did not match any exclude patterns
-[backend] Matched 1 file(s)
+File: src/backend/api.ts
+  -> Matches: backend (matched include "src/backend/**")
+  -> Not matched: frontend, python
+
+File: src/backend/api.test.ts
+  -> Matches: none
+  -> Not matched: backend, frontend, python
+
+File: src/frontend/app.tsx
+  -> Matches: frontend (matched include "src/frontend/**")
+  -> Not matched: backend, python
+```
+
+#### `debug: verbose` (Detailed)
+Shows detailed per-section logs for every file and every area. Use this only when you need to see the complete matching logic flow.
+
+```yaml
+- uses: f1rmtea/changed-files@main
+  with:
+    debug: verbose
+    config_inline: |
+      areas:
+        backend:
+          include:
+            - "src/backend/**"
+          exclude:
+            - "**/*.test.ts"
+```
+
+**Output:**
+```
+[backend] src/backend/api.ts matched include "src/backend/**"
+[backend] src/backend/api.ts did not match any exclude patterns
+[frontend] src/backend/api.ts did not match any include patterns
+[python] src/backend/api.ts did not match any include patterns
 
 [backend] src/backend/api.test.ts matched include "src/backend/**"
 [backend] src/backend/api.test.ts excluded by "**/*.test.ts"
-
-[python] requirements.txt matched include "**/*.py"
-[python] requirements.txt ignored (extension ".txt" not in required_extensions)
-
-[python] scripts/deploy.py matched include "**/*.py"
-[python] scripts/deploy.py did not match any exclude patterns
-[python] Matched 1 file(s)
+[frontend] src/backend/api.test.ts did not match any include patterns
+[python] src/backend/api.test.ts did not match any include patterns
 ```
 
 ### What Debug Mode Shows
 
-For each file and area combination, debug mode explains:
+Debug mode explains matching behavior including:
 
-- **Which include pattern matched** - Shows the exact pattern that matched the file
+- **Include pattern matches** - Shows which pattern matched the file
 - **Exclude behavior** - Shows if the file was excluded and which pattern excluded it
 - **Extension filtering** - Shows when files are ignored due to `required_extensions`
 - **Binary file handling** - Shows when files are ignored due to `exclude_binary_files`
 - **Deleted file handling** - Shows when files are ignored due to `ignore_deleted_files`
 - **Renamed file handling** - Shows when pure renames are ignored due to `ignore_renamed_files`
 - **No match explanation** - Shows when files don't match any include patterns
+
+### Choosing a Debug Level
+
+- **`false`**: Production workflows where you only need final results
+- **`true`**: Troubleshooting pattern matching - shows per-file summaries (recommended)
+- **`verbose`**: Deep debugging - shows every decision for every area (very noisy)
 
 ## Troubleshooting
 

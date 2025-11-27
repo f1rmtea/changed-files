@@ -14,7 +14,7 @@ describe('File Matcher', () => {
         include: ['src/backend/**']
       };
 
-      expect(classifyFile(file, config)).toBe(true);
+      expect(classifyFile(file, config).matched).toBe(true);
     });
 
     it('should not match files outside include patterns', () => {
@@ -28,7 +28,7 @@ describe('File Matcher', () => {
         include: ['src/backend/**']
       };
 
-      expect(classifyFile(file, config)).toBe(false);
+      expect(classifyFile(file, config).matched).toBe(false);
     });
   });
 
@@ -45,7 +45,7 @@ describe('File Matcher', () => {
         exclude: ['**/*.test.ts']
       };
 
-      expect(classifyFile(file, config)).toBe(false);
+      expect(classifyFile(file, config).matched).toBe(false);
     });
 
     it('should match files not in exclude patterns', () => {
@@ -60,7 +60,7 @@ describe('File Matcher', () => {
         exclude: ['**/*.test.ts']
       };
 
-      expect(classifyFile(file, config)).toBe(true);
+      expect(classifyFile(file, config).matched).toBe(true);
     });
   });
 
@@ -83,8 +83,8 @@ describe('File Matcher', () => {
         required_extensions: ['.ts', '.tsx']
       };
 
-      expect(classifyFile(tsFile, config)).toBe(true);
-      expect(classifyFile(jsFile, config)).toBe(false);
+      expect(classifyFile(tsFile, config).matched).toBe(true);
+      expect(classifyFile(jsFile, config).matched).toBe(false);
     });
   });
 
@@ -101,7 +101,7 @@ describe('File Matcher', () => {
         exclude_binary_files: true
       };
 
-      expect(classifyFile(file, config)).toBe(false);
+      expect(classifyFile(file, config).matched).toBe(false);
     });
 
     it('should include binary files by default', () => {
@@ -115,7 +115,7 @@ describe('File Matcher', () => {
         include: ['assets/**']
       };
 
-      expect(classifyFile(file, config)).toBe(true);
+      expect(classifyFile(file, config).matched).toBe(true);
     });
   });
 
@@ -132,7 +132,7 @@ describe('File Matcher', () => {
         ignore_deleted_files: true
       };
 
-      expect(classifyFile(file, config)).toBe(false);
+      expect(classifyFile(file, config).matched).toBe(false);
     });
 
     it('should ignore renamed files without content changes when configured', () => {
@@ -151,7 +151,7 @@ describe('File Matcher', () => {
         ignore_renamed_files: true
       };
 
-      expect(classifyFile(file, config)).toBe(false);
+      expect(classifyFile(file, config).matched).toBe(false);
     });
 
     it('should NOT ignore renamed files with content changes when ignore_renamed_files is true', () => {
@@ -170,7 +170,7 @@ describe('File Matcher', () => {
         ignore_renamed_files: true
       };
 
-      expect(classifyFile(file, config)).toBe(true);
+      expect(classifyFile(file, config).matched).toBe(true);
     });
 
     it('should handle renamed files with only additions', () => {
@@ -189,7 +189,7 @@ describe('File Matcher', () => {
         ignore_renamed_files: true
       };
 
-      expect(classifyFile(file, config)).toBe(true);
+      expect(classifyFile(file, config).matched).toBe(true);
     });
 
     it('should handle renamed files with only deletions', () => {
@@ -208,7 +208,7 @@ describe('File Matcher', () => {
         ignore_renamed_files: true
       };
 
-      expect(classifyFile(file, config)).toBe(true);
+      expect(classifyFile(file, config).matched).toBe(true);
     });
 
     it('should handle renamed files without additions/deletions data (treat as pure rename)', () => {
@@ -225,7 +225,7 @@ describe('File Matcher', () => {
       };
 
       // Without additions/deletions data, we assume it's a pure rename
-      expect(classifyFile(file, config)).toBe(false);
+      expect(classifyFile(file, config).matched).toBe(false);
     });
   });
 });

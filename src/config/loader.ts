@@ -1,9 +1,19 @@
 import * as core from '@actions/core';
 import * as fs from 'fs';
 import * as yaml from 'js-yaml';
-import { UnifiedConfig, AreaConfig, ActionInputs } from '../types';
+import { UnifiedConfig, AreaConfig, ActionInputs, DebugMode } from '../types';
 import { ConfigError } from '../errors';
 import { Logger } from '../utils/logger';
+
+function parseDebugMode(input: string): DebugMode {
+  if (input === 'verbose') {
+    return 'verbose';
+  }
+  if (input === 'true') {
+    return true;
+  }
+  return false;
+}
 
 export function getActionInputs(): ActionInputs {
   return {
@@ -16,7 +26,7 @@ export function getActionInputs(): ActionInputs {
       empty_commit_behavior: (core.getInput('empty_commit_behavior') as 'none' | 'all') || 'none',
       ignore_binary_files: core.getInput('ignore_binary_files') === 'true',
       strict_validation: core.getInput('strict_validation') === 'true',
-      debug: core.getInput('debug') === 'true'
+      debug: parseDebugMode(core.getInput('debug'))
     }
   };
 }

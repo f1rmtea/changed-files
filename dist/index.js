@@ -34409,12 +34409,13 @@ function classifyFile(file, areaConfig, areaName, debug = false) {
         return matches;
     });
     if (!matchesInclude) {
-        if (debug && areaName) {
-            logger_1.Logger.info(`[${areaName}] ${file.path} did not match any include patterns`);
+        const reason = 'did not match any include patterns';
+        if (debug === 'verbose' && areaName) {
+            logger_1.Logger.info(`[${areaName}] ${file.path} ${reason}`);
         }
-        return false;
+        return { matched: false, reason };
     }
-    if (debug && areaName && matchedIncludePattern) {
+    if (debug === 'verbose' && areaName && matchedIncludePattern) {
         logger_1.Logger.info(`[${areaName}] ${file.path} matched include "${matchedIncludePattern}"`);
     }
     // Step 2: Check if matches ANY exclude pattern
@@ -34428,65 +34429,106 @@ function classifyFile(file, areaConfig, areaName, debug = false) {
             return matches;
         });
         if (matchesExclude) {
-            if (debug && areaName && matchedExcludePattern) {
-                logger_1.Logger.info(`[${areaName}] ${file.path} excluded by "${matchedExcludePattern}"`);
+            const reason = `excluded by "${matchedExcludePattern}"`;
+            if (debug === 'verbose' && areaName) {
+                logger_1.Logger.info(`[${areaName}] ${file.path} ${reason}`);
             }
-            return false;
+            return { matched: false, reason };
         }
     }
-    if (debug && areaName) {
+    if (debug === 'verbose' && areaName) {
         logger_1.Logger.info(`[${areaName}] ${file.path} did not match any exclude patterns`);
     }
     // Step 3: Check required_extensions
     if (areaConfig.required_extensions && areaConfig.required_extensions.length > 0) {
         const fileExt = path.extname(file.path);
         if (!areaConfig.required_extensions.includes(fileExt)) {
-            if (debug && areaName) {
-                logger_1.Logger.info(`[${areaName}] ${file.path} ignored (extension "${fileExt || '(none)'}" not in required_extensions)`);
+            const reason = `extension "${fileExt || '(none)'}" not in required_extensions`;
+            if (debug === 'verbose' && areaName) {
+                logger_1.Logger.info(`[${areaName}] ${file.path} ignored (${reason})`);
             }
-            return false;
+            return { matched: false, reason };
         }
     }
     // Step 4: Check exclude_binary_files
     if (areaConfig.exclude_binary_files && file.binary) {
-        if (debug && areaName) {
+        const reason = 'binary file excluded';
+        if (debug === 'verbose' && areaName) {
             logger_1.Logger.info(`[${areaName}] ${file.path} ignored (binary file)`);
         }
-        return false;
+        return { matched: false, reason };
     }
     // Step 5: Check ignore_deleted_files
     if (areaConfig.ignore_deleted_files && file.status === 'removed') {
-        if (debug && areaName) {
+        const reason = 'deleted file ignored';
+        if (debug === 'verbose' && areaName) {
             logger_1.Logger.info(`[${areaName}] ${file.path} ignored (deleted file)`);
         }
-        return false;
+        return { matched: false, reason };
     }
     // Step 6: Check ignore_renamed_files
     // Only ignore renamed files that have no content changes (pure renames)
     if (areaConfig.ignore_renamed_files && file.status === 'renamed') {
         const hasContentChanges = (file.additions ?? 0) > 0 || (file.deletions ?? 0) > 0;
         if (!hasContentChanges) {
-            if (debug && areaName) {
+            const reason = 'pure rename, no content changes';
+            if (debug === 'verbose' && areaName) {
                 logger_1.Logger.info(`[${areaName}] ${file.path} ignored (pure rename, no content changes)`);
             }
-            return false;
+            return { matched: false, reason };
         }
     }
-    return true;
+    return { matched: true, reason: matchedIncludePattern ? `matched include "${matchedIncludePattern}"` : 'matched' };
+}
+function logGroupedDebugInfo(debugInfo) {
+    for (const fileInfo of debugInfo) {
+        const matched = fileInfo.matches.filter(m => m.matched);
+        const notMatched = fileInfo.matches.filter(m => !m.matched);
+        logger_1.Logger.info(`File: ${fileInfo.filePath}`);
+        if (matched.length > 0) {
+            const matchedList = matched.map(m => `${m.areaName} (${m.reason})`).join(', ');
+            logger_1.Logger.info(`  -> Matches: ${matchedList}`);
+        }
+        if (notMatched.length > 0) {
+            const notMatchedList = notMatched.map(m => m.areaName).join(', ');
+            logger_1.Logger.info(`  -> Not matched: ${notMatchedList}`);
+        }
+    }
 }
 function classifyFiles(files, areas, debug = false) {
     const results = {};
+    const debugInfoByFile = [];
     // Initialize all areas
     for (const areaName of Object.keys(areas)) {
         results[areaName] = [];
     }
     // Classify each file
     for (const file of files) {
+        const fileDebugInfo = {
+            filePath: file.path,
+            matches: []
+        };
         for (const [areaName, areaConfig] of Object.entries(areas)) {
-            if (classifyFile(file, areaConfig, areaName, debug)) {
+            const result = classifyFile(file, areaConfig, areaName, debug);
+            if (result.matched) {
                 results[areaName].push(file);
             }
+            // Collect debug info for grouped output
+            if (debug === true) {
+                fileDebugInfo.matches.push({
+                    areaName,
+                    matched: result.matched,
+                    reason: result.reason
+                });
+            }
         }
+        if (debug === true) {
+            debugInfoByFile.push(fileDebugInfo);
+        }
+    }
+    // Output grouped debug info if debug mode is 'true'
+    if (debug === true && debugInfoByFile.length > 0) {
+        logGroupedDebugInfo(debugInfoByFile);
     }
     return results;
 }
@@ -34541,6 +34583,15 @@ const fs = __importStar(__nccwpck_require__(9896));
 const yaml = __importStar(__nccwpck_require__(4281));
 const errors_1 = __nccwpck_require__(3916);
 const logger_1 = __nccwpck_require__(7893);
+function parseDebugMode(input) {
+    if (input === 'verbose') {
+        return 'verbose';
+    }
+    if (input === 'true') {
+        return true;
+    }
+    return false;
+}
 function getActionInputs() {
     return {
         config: core.getInput('config') || '.github/changed-areas.yml',
@@ -34552,7 +34603,7 @@ function getActionInputs() {
             empty_commit_behavior: core.getInput('empty_commit_behavior') || 'none',
             ignore_binary_files: core.getInput('ignore_binary_files') === 'true',
             strict_validation: core.getInput('strict_validation') === 'true',
-            debug: core.getInput('debug') === 'true'
+            debug: parseDebugMode(core.getInput('debug'))
         }
     };
 }
